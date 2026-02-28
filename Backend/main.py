@@ -1,10 +1,12 @@
 from fastapi import FastAPI, WebSocket,WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse, FileResponse
 from survey import  mavlink_logger
-from fastapi.responses import JSONResponse
 import threading
 import asyncio
 import json
+import os
 
 from Vehicle_state import vehicle_state
 from pixhawk_reader import PixhawkReader
@@ -19,6 +21,26 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ---------- SERVE FRONTEND BUILD ----------
+# Get the path to the dist folder
+dist_dir = os.path.join(os.path.dirname(__file__), "..", "Frontend", "dist")
+
+# Mount the static files (assets, favicon, etc.)
+app.mount("/assets", StaticFiles(directory=os.path.join(dist_dir, "assets")), name="assets")
+
+# Serve index.html for SPA routing (catch-all route for non-API paths)
+@app.get("/{full_path:path}")
+async def serve_spa(full_path: str):
+    """Serve index.html for all non-API routes to support SPA routing"""
+    # If the path is for an API endpoint, let it through to the API handlers
+    if full_path.startswith("api/") or full_path.startswith("ws/"):
+        return JSONResponse({"error": "Not Found"}, status_code=404)
+    
+    index_path = os.path.join(dist_dir, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    return JSONResponse({"error": "Frontend build not found"}, status_code=404)
 
 # ---------------- REST ENDPOINT ----------------
 @app.get("/vehicle")
