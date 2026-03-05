@@ -18,7 +18,7 @@ export function VehicleStatusPanel({
   vehicleMode = "AUTO",
   gnssSatellites = 34,
   camera = true,
-  rcConnection =false,
+  rcConnection = false,
   onModeChange,
   onCameraToggle,
 }: VehicleStatusPanelProps) {

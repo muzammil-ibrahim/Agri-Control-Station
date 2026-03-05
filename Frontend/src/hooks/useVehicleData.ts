@@ -20,7 +20,7 @@ export interface VehicleData {
   four_ws_active: boolean;
 }
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "ws://10.11.100.132:8000";
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "ws://localhost:8000";
 
 export function useVehicleData() {
   const [data, setData] = useState<VehicleData | null>(null);
@@ -57,7 +57,6 @@ export function useVehicleData() {
 
         ws.onclose = () => {
           console.log("WebSocket disconnected, attempting to reconnect...");
-          // Reconnect after 3 seconds
           setTimeout(connectWebSocket, 3000);
         };
 

@@ -56,7 +56,7 @@ function processWheelsData(wheels?: Record<string, BackendWheelData>): Processed
   ];
 }
 
-function WheelIndicator({ wheel, compact }: { wheel: ProcessedWheelData; compact?: boolean }) {
+function WheelIndicator({ wheel }: { wheel: ProcessedWheelData; compact?: boolean }) {
   const isForward = wheel.direction === "forward";
   const isReverse = wheel.direction === "reverse";
   const isIdle = wheel.direction === "idle";
@@ -67,7 +67,6 @@ function WheelIndicator({ wheel, compact }: { wheel: ProcessedWheelData; compact
       "flex flex-col items-center gap-0.5",
       isLeft ? "items-end" : "items-start"
     )}>
-      {/* Speed info */}
       <div className={cn(
         "flex flex-col",
         isLeft ? "items-end text-right" : "items-start text-left"
@@ -86,7 +85,6 @@ function WheelIndicator({ wheel, compact }: { wheel: ProcessedWheelData; compact
         </span>
       </div>
 
-      {/* Wheel visualization */}
       <div
         className={cn(
           "w-4 h-8 rounded-sm border-2 transition-all duration-300 relative",
@@ -116,37 +114,25 @@ export function WheelStatusInline({ wheels, fourWSActive = true }: WheelStatusIn
 
   return (
     <div className="flex-1 flex items-center justify-center">
-      {/* Vehicle schematic - compact version */}
       <div className="relative w-32 h-44">
-        {/* Vehicle body */}
         <div className="absolute inset-x-6 inset-y-6 bg-muted/30 rounded-xl border border-border">
-          {/* Windshield */}
           <div className="absolute top-2 inset-x-2 h-5 bg-muted/50 rounded-t-md border-b border-border" />
-          {/* Rear window */}
           <div className="absolute bottom-2 inset-x-2 h-4 bg-muted/50 rounded-b-md border-t border-border" />
         </div>
 
-        {/* Front Left Wheel */}
         <div className="absolute top-0 left-0">
           <WheelIndicator wheel={frontLeft} compact />
         </div>
-
-        {/* Front Right Wheel */}
         <div className="absolute top-0 right-0">
           <WheelIndicator wheel={frontRight} compact />
         </div>
-
-        {/* Rear Left Wheel */}
         <div className="absolute bottom-0 left-0">
           <WheelIndicator wheel={rearLeft} compact />
         </div>
-
-        {/* Rear Right Wheel */}
         <div className="absolute bottom-0 right-0">
           <WheelIndicator wheel={rearRight} compact />
         </div>
 
-        {/* Travel direction indicator */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
           <ArrowUp className="w-4 h-4 text-primary" />
         </div>

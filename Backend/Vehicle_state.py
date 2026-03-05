@@ -13,11 +13,11 @@ vehicle_state = VehicleData(
     rc_connection=False,
 
     batteries={
-        "B1": 60,
-        "B2": 50,
-        "B3": 20,
-        "B4": 50,
-        "B5": 10,
+        "B1": 0,
+        "B2": 0,
+        "B3": 0,
+        "B4": 0,
+        "B5": 0,
     },
 
     actuator_x=100,

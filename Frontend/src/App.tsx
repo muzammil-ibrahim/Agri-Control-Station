@@ -13,7 +13,6 @@ import Fields from "./pages/Fields";
 import PlotCreate from "./pages/PlotCreate";
 import PlotMapping from "./pages/PlotMapping";
 import NotFound from "./pages/NotFound";
-import { ToastViewport } from "./components/ui/toast";
 
 const queryClient = new QueryClient();
 
@@ -26,7 +25,7 @@ const navItems = [
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster/>
+      <Toaster />
       <Sonner />
       <BrowserRouter>
         <div className="relative min-h-screen bg-background w-full">

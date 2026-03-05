@@ -7,6 +7,7 @@ const defaultCells = [
 ];
 
 function dotColor(v: number) {
+  if (v === 0) return "bg-red-600"; // error
   if (v >= 40) return "bg-success";
   if (v >= 20) return "bg-warning";
   return "bg-danger";
@@ -26,16 +27,37 @@ export function BatteryStatusPanel({ batteries }: BatteryStatusPanelProps) {
       <span className="text-[8px] sm:text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-2">
         Battery Status
       </span>
+
       <div className="flex flex-col gap-2 text-[11px] sm:text-sm">
-        {cells.map((c) => (
-          <div key={c.id} className="flex items-center justify-between">
-            <span className="text-muted-foreground text-[10px] sm:text-xs">{c.id}</span>
-            <div className="flex items-center gap-1 sm:gap-1.5">
-              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${dotColor(c.voltage)}`} />
-              <span className="text-foreground font-medium font-mono text-[10px] sm:text-xs">{c.voltage}V</span>
+        {cells.map((c) => {
+          const isError = c.voltage < 1;
+
+          return (
+            <div key={c.id} className="flex items-center justify-between">
+              <span className="text-muted-foreground text-[10px] sm:text-xs">
+                {c.id}
+              </span>
+
+              <div className="flex items-center gap-1 sm:gap-1.5">
+                <div
+                  className={`w-2 h-2 rounded-full flex-shrink-0 ${dotColor(
+                    c.voltage
+                  )}`}
+                />
+
+                {isError ? (
+                  <span className="text-red-500 font-semibold text-[10px] sm:text-xs">
+                    Error
+                  </span>
+                ) : (
+                  <span className="text-foreground font-medium font-mono text-[10px] sm:text-xs">
+                    {c.voltage}V
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

@@ -57,7 +57,6 @@ export function CircularGauge({
     primary: "",
   };
 
-  // Calculate needle rotation (0 to 270 degrees for 3/4 gauge)
   const needleRotation = (percentage / 100) * 270 - 135;
 
   return (
@@ -66,7 +65,6 @@ export function CircularGauge({
         viewBox="0 0 100 100"
         className={cn("transform -rotate-90", glowClasses[variant])}
       >
-        {/* Background track */}
         <circle
           cx="50"
           cy="50"
@@ -76,7 +74,6 @@ export function CircularGauge({
           strokeWidth="8"
           strokeLinecap="round"
         />
-        {/* Value arc */}
         <circle
           cx="50"
           cy="50"
@@ -90,7 +87,6 @@ export function CircularGauge({
         />
       </svg>
 
-      {/* Needle */}
       {showNeedle && (
         <div
           className="absolute inset-0 flex items-center justify-center"
@@ -100,7 +96,6 @@ export function CircularGauge({
         </div>
       )}
 
-      {/* Center display */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className={cn("font-mono font-bold text-foreground", textSizes[size])}>
           {Math.round(value)}
@@ -112,7 +107,6 @@ export function CircularGauge({
         )}
       </div>
 
-      {/* Label below */}
       <span className={cn("mt-2 text-muted-foreground uppercase tracking-wider text-center", labelSizes[size])}>
         {label}
       </span>

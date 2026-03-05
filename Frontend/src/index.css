@@ -4,40 +4,40 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
-/* Agricultural Vehicle Control Dashboard - Instrument Cluster Theme */
+/* Agricultural Vehicle Control Dashboard - Light Mode Theme */
 
 @layer base {
   :root {
-    /* Dark dashboard background */
-    --background: 220 20% 10%;
-    --foreground: 210 20% 95%;
+    /* Light dashboard background */
+    --background: 210 20% 98%;
+    --foreground: 220 20% 10%;
 
-    /* Card panels - slightly elevated */
-    --card: 220 18% 14%;
-    --card-foreground: 210 20% 95%;
+    /* Card panels */
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 10%;
 
     /* Popover/dropdown */
-    --popover: 220 18% 14%;
-    --popover-foreground: 210 20% 95%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 10%;
 
     /* Primary - Agricultural Green */
-    --primary: 142 60% 45%;
+    --primary: 142 60% 38%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary - Muted earth tone */
-    --secondary: 220 15% 20%;
-    --secondary-foreground: 210 20% 90%;
+    /* Secondary */
+    --secondary: 210 15% 93%;
+    --secondary-foreground: 220 20% 15%;
 
     /* Muted elements */
-    --muted: 220 15% 18%;
-    --muted-foreground: 215 15% 55%;
+    --muted: 210 15% 93%;
+    --muted-foreground: 215 15% 45%;
 
     /* Accent - Warm amber for highlights */
     --accent: 38 92% 50%;
     --accent-foreground: 0 0% 10%;
 
     /* Status colors */
-    --success: 142 70% 45%;
+    --success: 142 70% 38%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 10%;
@@ -49,30 +49,29 @@
     --destructive-foreground: 0 0% 100%;
 
     /* Borders and inputs */
-    --border: 220 15% 22%;
-    --input: 220 15% 22%;
-    --ring: 142 60% 45%;
+    --border: 214 20% 88%;
+    --input: 214 20% 88%;
+    --ring: 142 60% 38%;
 
     --radius: 0.75rem;
 
     /* Gauge specific */
-    --gauge-bg: 220 15% 18%;
-    --gauge-track: 220 15% 25%;
-    --gauge-needle: 0 0% 90%;
+    --gauge-bg: 210 15% 93%;
+    --gauge-track: 210 15% 82%;
+    --gauge-needle: 220 20% 25%;
 
-    /* Sidebar (for potential future use) */
-    --sidebar-background: 220 20% 12%;
-    --sidebar-foreground: 210 20% 90%;
-    --sidebar-primary: 142 60% 45%;
+    /* Sidebar */
+    --sidebar-background: 210 15% 96%;
+    --sidebar-foreground: 220 20% 20%;
+    --sidebar-primary: 142 60% 38%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 15% 20%;
-    --sidebar-accent-foreground: 210 20% 90%;
-    --sidebar-border: 220 15% 22%;
-    --sidebar-ring: 142 60% 45%;
+    --sidebar-accent: 210 15% 93%;
+    --sidebar-accent-foreground: 220 20% 20%;
+    --sidebar-border: 214 20% 88%;
+    --sidebar-ring: 142 60% 38%;
   }
 
   .dark {
-    /* Same as root - dashboard is always dark */
     --background: 220 20% 10%;
     --foreground: 210 20% 95%;
     --card: 220 18% 14%;
@@ -87,11 +86,20 @@
     --muted-foreground: 215 15% 55%;
     --accent: 38 92% 50%;
     --accent-foreground: 0 0% 10%;
+    --success: 142 70% 42%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 10%;
+    --danger: 0 72% 51%;
+    --danger-foreground: 0 0% 100%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
     --border: 220 15% 22%;
     --input: 220 15% 22%;
     --ring: 142 60% 45%;
+    --gauge-bg: 220 15% 18%;
+    --gauge-track: 220 15% 28%;
+    --gauge-needle: 210 20% 80%;
     --sidebar-background: 220 20% 12%;
     --sidebar-foreground: 210 20% 90%;
     --sidebar-primary: 142 60% 45%;
@@ -113,49 +121,40 @@
     font-family: 'Inter', sans-serif;
   }
 
-  /* Monospace numbers for gauges */
   .font-mono {
     font-family: 'JetBrains Mono', monospace;
   }
 }
 
 @layer components {
-  /* Dashboard panel styling */
   .dashboard-panel {
-    @apply bg-card rounded-xl border border-border p-4 shadow-lg;
-    background: linear-gradient(
-      180deg,
-      hsl(var(--card)) 0%,
-      hsl(220 18% 12%) 100%
-    );
+    @apply bg-card rounded-xl border border-border p-4 shadow-sm;
   }
 
   .vehicle-wrapper {
-  width: 40px;
-  height: 40px;
-  transform-origin: center;
-  transition: transform 0.1s linear;
+    width: 40px;
+    height: 40px;
+    transform-origin: center;
+    transition: transform 0.1s linear;
   }
 
   .vehicle-img {
-  width: 100%;
-  height: 100%;
+    width: 100%;
+    height: 100%;
   }
 
-  /* Gauge glow effects */
   .gauge-glow-success {
-    filter: drop-shadow(0 0 8px hsl(var(--success) / 0.4));
+    filter: drop-shadow(0 0 6px hsl(var(--success) / 0.3));
   }
 
   .gauge-glow-warning {
-    filter: drop-shadow(0 0 8px hsl(var(--warning) / 0.4));
+    filter: drop-shadow(0 0 6px hsl(var(--warning) / 0.3));
   }
 
   .gauge-glow-danger {
-    filter: drop-shadow(0 0 8px hsl(var(--danger) / 0.4));
+    filter: drop-shadow(0 0 6px hsl(var(--danger) / 0.3));
   }
 
-  /* Status indicator pulse */
   .status-pulse {
     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
@@ -169,7 +168,6 @@
     }
   }
 
-  /* Control button styling */
   .control-btn {
     @apply font-semibold uppercase tracking-wider transition-all duration-200;
     @apply active:scale-95;
@@ -177,22 +175,21 @@
 
   .control-btn-start {
     @apply bg-success text-success-foreground hover:bg-success/90;
-    box-shadow: 0 4px 14px hsl(var(--success) / 0.3);
+    box-shadow: 0 4px 14px hsl(var(--success) / 0.2);
   }
 
   .control-btn-stop {
     @apply bg-warning text-warning-foreground hover:bg-warning/90;
-    box-shadow: 0 4px 14px hsl(var(--warning) / 0.3);
+    box-shadow: 0 4px 14px hsl(var(--warning) / 0.2);
   }
 
   .control-btn-emergency {
     @apply bg-danger text-danger-foreground hover:bg-danger/90;
-    box-shadow: 0 4px 14px hsl(var(--danger) / 0.3);
+    box-shadow: 0 4px 14px hsl(var(--danger) / 0.2);
   }
 }
 
 @layer utilities {
-  /* Hide scrollbar but keep functionality */
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -201,39 +198,34 @@
     display: none;
   }
 
-  /* Safe area padding for mobile notches/safe regions */
   .safe-area-inset-bottom {
     padding-bottom: max(0px, env(safe-area-inset-bottom));
   }
-  
+
   .safe-area-inset-top {
     padding-top: max(0px, env(safe-area-inset-top));
   }
-  
+
   .safe-area-inset-left {
     padding-left: max(0px, env(safe-area-inset-left));
   }
-  
+
   .safe-area-inset-right {
     padding-right: max(0px, env(safe-area-inset-right));
   }
 
-  /* Responsive container max-width */
   .responsive-container {
     @apply w-full max-w-7xl mx-auto;
   }
 
-  /* Responsive text truncation */
   .line-clamp-1 {
     @apply overflow-hidden text-ellipsis whitespace-nowrap;
   }
 
-  /* Touch-friendly button sizing */
   .touch-target {
     @apply min-h-[44px] min-w-[44px];
   }
 
-  /* Responsive padding */
   .p-safe {
     @apply p-2 sm:p-3 md:p-4;
   }
@@ -246,5 +238,3 @@
     @apply py-2 sm:py-3 md:py-4;
   }
 }
-
-

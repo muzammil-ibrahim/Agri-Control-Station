@@ -20,8 +20,6 @@ export function SemiCircleGauge({
   className,
 }: SemiCircleGaugeProps) {
   const percentage = Math.min((value / max) * 100, 100);
-  
-  // Semi-circle uses half the circumference
   const radius = 45;
   const strokeDasharray = Math.PI * radius;
   const strokeDashoffset = strokeDasharray - (percentage / 100) * strokeDasharray;
@@ -65,7 +63,6 @@ export function SemiCircleGauge({
           viewBox="0 0 100 55"
           className={cn("w-full h-full", glowClasses[variant])}
         >
-          {/* Background track */}
           <path
             d="M 5 50 A 45 45 0 0 1 95 50"
             fill="none"
@@ -73,7 +70,6 @@ export function SemiCircleGauge({
             strokeWidth="8"
             strokeLinecap="round"
           />
-          {/* Value arc */}
           <path
             d="M 5 50 A 45 45 0 0 1 95 50"
             fill="none"
@@ -85,7 +81,6 @@ export function SemiCircleGauge({
           />
         </svg>
 
-        {/* Center display */}
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 flex flex-col items-center">
           <span className={cn("font-mono font-bold text-foreground leading-none", textSizes[size])}>
             {Math.round(value)}
@@ -98,7 +93,6 @@ export function SemiCircleGauge({
         </div>
       </div>
 
-      {/* Min/Max labels */}
       <div className="flex justify-between w-full px-1 -mt-1">
         <span className={cn("text-muted-foreground", labelSizes[size])}>0</span>
         <span className={cn("text-muted-foreground uppercase tracking-wider font-medium", labelSizes[size])}>

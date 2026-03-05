@@ -2,7 +2,7 @@ from pymavlink import mavutil
 import asyncio
 import time
 
-PIXHAWK_PORT = "COM10"
+PIXHAWK_PORT = "COM3"
 BAUDRATE = 57600
 
 
@@ -39,6 +39,18 @@ class PixhawkReader:
                 self.master.wait_heartbeat(timeout=5)
 
                 print("✅ Pixhawk Connected")
+                            # 🔥 Request BATTERY_STATUS messages
+                self.master.mav.command_long_send(
+                    self.master.target_system,
+                    self.master.target_component,
+                    mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL, 
+                    0,
+                    mavutil.mavlink.MAVLINK_MSG_ID_BATTERY_STATUS,
+                    1000000,  # 1 second
+                    0,0,0,0,0
+                )
+
+                print("🔋 Requested BATTERY_STATUS stream")
                 self.connected = True
                 return
 
@@ -86,6 +98,19 @@ class PixhawkReader:
                     self.vehicle_state.lat = msg.lat / 1e7
                     self.vehicle_state.lon = msg.lon / 1e7
 
+                # ---------------- Battery ----------------
+                elif msg_type == "BATTERY_STATUS":
+
+                    battery_id = msg.id
+                    voltage_raw = msg.voltages[0]
+
+                    # If telemetry sends 0 or invalid voltage
+                    if voltage_raw <= 0:
+                        voltage = 0
+                    else:
+                        voltage = voltage_raw / 1000.0
+
+                    self.vehicle_state.batteries[f"B{battery_id}"] = voltage
                 
                 # ---------------- RC CONNECTION ----------------
                 elif msg_type == "RC_CHANNELS":
