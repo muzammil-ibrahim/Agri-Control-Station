@@ -1,10 +1,10 @@
 import { cn } from "@/lib/utils";
-import { ArrowLeft, Camera, MapPin } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Camera, X } from "lucide-react";
+import { useParams } from "react-router-dom";
 import { Progress } from "@/components/ui/progress";
-import { useState } from "react";
-import { AppHeader } from "@/components/dashboard/AppHeader";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { FieldMap } from "@/components/dashboard/FieldMap";
 import {
   Select,
   SelectContent,
@@ -14,6 +14,12 @@ import {
 } from "@/components/ui/select";
 import { useVehicleData } from "@/hooks/useVehicleData";
 import { useToast } from "@/hooks/use-toast";
+
+interface MapPoint {
+  id: string;
+  x: number;
+  y: number;
+}
 
 // Mock task data
 const tasksData: Record<string, { name: string; plot: string; progress: number; status: string }> = {
@@ -31,7 +37,6 @@ const logEntries = [
 ];
 
 export default function TaskDetail() {
-  const navigate = useNavigate();
   const { id } = useParams();
   const task = id ? tasksData[id] : null;
   const [isArmed, setIsArmed] = useState(false);
@@ -40,6 +45,113 @@ export default function TaskDetail() {
   const [isPaused, setIsPaused] = useState(false);
   const { data: vehicleData, loading, error } = useVehicleData();
   const { toast } = useToast();
+
+  // Map-related state
+  const [geofence, setGeofence] = useState<MapPoint[]>([]);
+  const [points, setPoints] = useState<MapPoint[]>([]);
+  const [tractorPos, setTractorPos] = useState({ x: 0, y: 0 });
+  const [yaw, setYaw] = useState(0);
+  const [drilledPoints, setDrilledPoints] = useState<string[]>([]);
+  const [isOverlayDismissed, setIsOverlayDismissed] = useState(false);
+
+  // Fetch CSV data
+  const fetchCSVData = () => {
+    // Use HTTP for CSV endpoints, WS only for real-time data
+    const httpUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
+    const baseUrl = httpUrl.replace("ws://", "http://").replace("wss://", "https://");
+    
+    Promise.all([
+      fetch(`${baseUrl}/get_csv`).then((res) => res.text()).catch(() => ""),
+      fetch(`${baseUrl}/get_csv1`).then((res) => res.text()).catch(() => ""),
+    ]).then(([geofenceCSV, pointsCSV]) => {
+      // Simple CSV parser
+      const parseCSV = (csv: string): any[] => {
+        const lines = csv.trim().split("\n");
+        if (lines.length < 2) return [];
+        
+        const headers = lines[0].split(",").map((h) => h.trim());
+        return lines.slice(1).map((line) => {
+          const values = line.split(",").map((v) => v.trim());
+          const obj: any = {};
+          headers.forEach((h, i) => {
+            obj[h] = values[i];
+          });
+          return obj;
+        });
+      };
+
+      if (geofenceCSV) {
+        const parsed = parseCSV(geofenceCSV);
+        setGeofence(
+          parsed.map((r: any, i: number) => ({
+            id: r.id ?? String(i + 1),
+            x: +r.x || 0,
+            y: +r.y || 0,
+          }))
+        );
+      }
+
+      if (pointsCSV) {
+        const parsed = parseCSV(pointsCSV);
+        setPoints(
+          parsed.map((r: any, i: number) => ({
+            id: r.id ?? String(i + 1),
+            x: +r.x || 0,
+            y: +r.y || 0,
+          }))
+        );
+      }
+    });
+  };
+
+  // Fetch CSV data on mount
+  useEffect(() => {
+    fetchCSVData();
+  }, []);
+
+  // WebSocket for yaw
+  useEffect(() => {
+    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+    const host = window.location.host;
+    const wsUrl = `${protocol}://${host.replace(":3000", ":8000")}/ws/yaw`;
+    
+    const ws = new WebSocket(wsUrl);
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        setYaw(data.yaw || 0);
+      } catch (e) {
+        console.error("Error parsing yaw data:", e);
+      }
+    };
+    ws.onerror = () => console.error("Yaw WebSocket error");
+    return () => ws.close();
+  }, []);
+
+  // WebSocket for location
+  useEffect(() => {
+    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+    const host = window.location.host;
+    const wsUrl = `${protocol}://${host.replace(":3000", ":8000")}/ws/location`;
+    
+    const ws = new WebSocket(wsUrl);
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        setTractorPos({ x: data.x || 0, y: data.y || 0 });
+      } catch (e) {
+        console.error("Error parsing location data:", e);
+      }
+    };
+    ws.onerror = () => console.error("Location WebSocket error");
+    return () => ws.close();
+  }, []);
+
+  useEffect(() => {
+    if (!error && !loading && vehicleData) {
+      setIsOverlayDismissed(false);
+    }
+  }, [error, loading, vehicleData]);
 
   const preChecks = [
     {
@@ -79,31 +191,14 @@ export default function TaskDetail() {
 
   if (!task) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-[50vh]">
         <p className="text-muted-foreground">Task not found</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col pb-16 sm:pb-20">
-      <AppHeader
-        title={task.name}
-        leftContent={
-          <button
-            onClick={() => navigate("/task")}
-            className={cn(
-              "flex items-center justify-center w-8 sm:w-10 h-8 sm:h-10 rounded-full",
-              "bg-card/90 border border-border",
-              "text-muted-foreground hover:text-foreground hover:bg-card",
-              "transition-all duration-200 active:scale-95 flex-shrink-0"
-            )}
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-        }
-      />
-
+    <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden">
       {/* Three-column grid */}
       <div className="flex-1 grid grid-cols-4 gap-0 overflow-hidden">
         {/* Left Column - 25% */}
@@ -189,11 +284,13 @@ export default function TaskDetail() {
 
         {/* Center Column - 50% (Map) */}
         <div className="col-span-2 flex items-center justify-center bg-muted/30">
-          <div className="flex flex-col items-center gap-2 text-muted-foreground">
-            <MapPin className="w-10 h-10" />
-            <span className="text-sm">Map View</span>
-            <p className="text-xs text-muted-foreground/60">{task.plot}</p>
-          </div>
+          <FieldMap
+            geofence={geofence}
+            points={points}
+            tractorPos={tractorPos}
+            yaw={yaw}
+            drilledPoints={drilledPoints}
+          />
         </div>
 
         {/* Right Column - 25% */}
@@ -240,6 +337,31 @@ export default function TaskDetail() {
           </div>
         </div>
       </div>
+      {/* error/connection overlay */}
+      {(error || loading || !vehicleData) && !isOverlayDismissed && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="relative text-center text-red-500 bg-background/90 p-6 rounded-lg border border-red-500/30 max-w-md">
+            <button
+              onClick={() => setIsOverlayDismissed(true)}
+              className="absolute top-2 right-2 rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+              aria-label="Close connection message"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <p className="text-lg font-semibold mb-2">
+              {loading ? "Connecting to vehicle..." : "Connection Error"}
+            </p>
+            <p className="text-sm mb-3">
+              {loading
+                ? "Establishing link to backend"
+                : error || "Unable to connect to vehicle data"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Make sure the backend is running at {import.meta.env.VITE_BACKEND_URL || "ws://localhost:8000"}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

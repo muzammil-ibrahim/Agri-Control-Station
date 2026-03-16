@@ -2,7 +2,7 @@ from pymavlink import mavutil
 import asyncio
 import time
 
-PIXHAWK_PORT = "COM3"
+PIXHAWK_PORT = "COM10"
 BAUDRATE = 57600
 
 
@@ -52,11 +52,21 @@ class PixhawkReader:
 
                 print("🔋 Requested BATTERY_STATUS stream")
                 self.connected = True
+                # update shared state so frontend knows we're connected
+                try:
+                    self.vehicle_state.connected = True
+                except Exception:
+                    pass
                 return
 
             except Exception as e:
                 print(f"❌ Pixhawk not found: {e}")
                 self.connected = False
+                # inform frontend we are disconnected
+                try:
+                    self.vehicle_state.connected = False
+                except Exception:
+                    pass
                 await asyncio.sleep(3)   # wait before retry
 
     async def read_loop(self):
@@ -128,6 +138,11 @@ class PixhawkReader:
             except Exception as e:
                 print("⚠️ Connection lost:", e)
                 self.connected = False
+                # signal disconnected state to frontend
+                try:
+                    self.vehicle_state.connected = False
+                except Exception:
+                    pass
                 self.master = None
                 await asyncio.sleep(2)
 

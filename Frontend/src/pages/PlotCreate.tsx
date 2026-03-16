@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { ArrowLeft, Upload } from "lucide-react";
+import { Upload } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -16,23 +16,7 @@ export default function PlotCreate() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20 pt-4 p-4 flex flex-col">
-      {/* Header */}
-      <header className="flex items-center gap-4 mb-6">
-        <button
-          onClick={() => navigate("/fields")}
-          className={cn(
-            "flex items-center justify-center w-10 h-10 rounded-full",
-            "bg-card/90 border border-border",
-            "text-muted-foreground hover:text-foreground hover:bg-card",
-            "transition-all duration-200 active:scale-95"
-          )}
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <h1 className="text-xl font-semibold text-foreground">Create Plot</h1>
-      </header>
-
+    <div className="pb-20 pt-4 p-4 flex flex-col">
       {/* Form */}
       <div className="flex-1 space-y-6">
         {/* Name Field */}

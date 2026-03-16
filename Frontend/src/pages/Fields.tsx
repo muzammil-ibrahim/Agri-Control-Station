@@ -39,13 +39,7 @@ export default function Fields() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-16 sm:pb-20 pt-14 sm:pt-16 p-2 sm:p-4">
-      {/* Title */}
-      <header className="mb-3 sm:mb-4 px-2 sm:px-0">
-        <h1 className="text-lg sm:text-xl font-semibold text-foreground">Field Management</h1>
-        <p className="text-[10px] sm:text-xs text-muted-foreground">{fields.length} fields registered</p>
-      </header>
-
+    <div className="pb-16 sm:pb-20 pt-4 p-2 sm:p-4">
       {/* Main grid - Responsive */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
         {/* Map - Takes full width on top */}
@@ -129,6 +123,7 @@ export default function Fields() {
       >
         <Plus className="w-6 h-6" />
       </button>
+
     </div>
   );
 }

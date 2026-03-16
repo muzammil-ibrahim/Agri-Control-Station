@@ -17,11 +17,11 @@ export function AppHeader({ title, subtitle, leftContent, extraButtons }: AppHea
   return (
     <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 shrink-0 gap-3 sm:gap-0">
       <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
-        {leftContent || (
+        {/* {leftContent || (
           <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center flex-shrink-0">
             <span className="text-primary text-[10px] sm:text-xs font-bold">AC</span>
           </div>
-        )}
+        )} */}
         <div className="flex-1 sm:flex-none">
           <h1 className="text-base sm:text-lg font-semibold text-foreground line-clamp-1">{title}</h1>
           {subtitle && <p className="text-[10px] sm:text-xs text-muted-foreground line-clamp-1">{subtitle}</p>}

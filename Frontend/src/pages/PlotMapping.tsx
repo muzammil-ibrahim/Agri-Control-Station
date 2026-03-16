@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Camera, MapPin } from "lucide-react";
+import { Camera, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import VehicleMap from "@/components/dashboard/VehicleMap";
@@ -25,14 +25,10 @@ import {
 import { useVehicleData } from "@/hooks/useVehicleData";
 import { useToast } from "@/hooks/use-toast";
 
+// default coordinates until we fetch real data
 const mockCoordinates = [
-  { label: "P1", lat: "17.4563", lng: "78.3462" },
-  { label: "P2", lat: "17.4568", lng: "78.3470" },
-  { label: "P3", lat: "17.4575", lng: "78.3465" },
-  { label: "P4", lat: "17.4580", lng: "78.3458" },
-  { label: "P5", lat: "17.4572", lng: "78.3450" },
-  { label: "P6", lat: "17.4565", lng: "78.3455" },
 ];
+
 
 export default function PlotMapping() {
   const navigate = useNavigate();
@@ -40,8 +36,44 @@ export default function PlotMapping() {
   const [isStarted, setIsStarted] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [showFinishDialog, setShowFinishDialog] = useState(false);
+  const [coordinates, setCoordinates] = useState<typeof mockCoordinates>(mockCoordinates);
+  const [isOverlayDismissed, setIsOverlayDismissed] = useState(false);
   const { data: vehicleData, loading, error } = useVehicleData();
   const { toast } = useToast();
+
+  // fetch geofence points from backend CSV and refresh periodically if started
+  const fetchGeofence = () => {
+    let backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
+    // convert websocket scheme to http(s) if necessary
+    backendUrl = backendUrl.replace(/^ws:/, "http:").replace(/^wss:/, "https:");
+    fetch(`${backendUrl}/api/geofence`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setCoordinates(
+            data.map((pt: any) => ({
+              label: pt.label || "",
+              lat: pt.latitude ?? pt.lat ?? "",
+              lng: pt.longitude ?? pt.lng ?? "",
+            }))
+          );
+        }
+      })
+      .catch((err) => console.error("Error fetching geofence:", err));
+  };
+
+  useEffect(() => {
+    fetchGeofence();
+    const interval = setInterval(fetchGeofence, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (!error && !loading && vehicleData) {
+      setIsOverlayDismissed(false);
+    }
+  }, [error, loading, vehicleData]);
+
 
   const preChecks = [
     {
@@ -85,7 +117,7 @@ export default function PlotMapping() {
 
   const handleStart = async () => {
     try {
-      const response = await fetch("http://localhost:8000/start", {
+      const response = await fetch("http://localhost:8000/api/start", {
         method: "POST",
       });
 
@@ -102,7 +134,7 @@ export default function PlotMapping() {
 
   const handleStop = async () => {
     try {
-      const response = await fetch("http://localhost:8000/stop", {
+      const response = await fetch("http://localhost:8000/api/stop", {
         method: "POST",
       });
 
@@ -121,23 +153,7 @@ export default function PlotMapping() {
 
 
   return (
-    <div className="h-screen flex flex-col bg-background">
-      {/* Header */}
-      <header className="flex items-center gap-3 px-4 py-2 border-b border-border bg-card shrink-0">
-        <button
-          onClick={() => navigate("/fields/create")}
-          className={cn(
-            "flex items-center justify-center w-9 h-9 rounded-full",
-            "bg-muted border border-border",
-            "text-muted-foreground hover:text-foreground hover:bg-accent",
-            "transition-all duration-200 active:scale-95"
-          )}
-        >
-          <ArrowLeft className="w-4 h-4" />
-        </button>
-        <h1 className="text-lg font-semibold text-foreground">Plot Mapping</h1>
-      </header>
-
+    <div className="relative h-[calc(100vh-4rem)] flex flex-col bg-background">
       {/* Three-column grid */}
       <div className="flex-1 grid grid-cols-4 gap-0 overflow-hidden">
         {/* Left Column - 25% */}
@@ -181,7 +197,7 @@ export default function PlotMapping() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mockCoordinates.map((coord) => (
+                {coordinates.map((coord) => (
                   <TableRow key={coord.label}>
                     <TableCell className="p-2 text-xs font-medium">{coord.label}</TableCell>
                     <TableCell className="p-2 text-xs text-muted-foreground">{coord.lat}</TableCell>
@@ -194,7 +210,7 @@ export default function PlotMapping() {
         </div>
 
         {/* Center Column - 50% (Map) */}
-        <div className="col-span-2 bg-muted/30 h-[calc(100vh-120px)] z-[0]">
+        <div className="col-span-2 bg-muted/30 h-full z-[0]">
           <VehicleMap />
         </div>
 
@@ -256,6 +272,31 @@ export default function PlotMapping() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {(error || loading || !vehicleData) && !isOverlayDismissed && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="relative text-center text-red-500 bg-background/90 p-6 rounded-lg border border-red-500/30 max-w-md">
+            <button
+              onClick={() => setIsOverlayDismissed(true)}
+              className="absolute top-2 right-2 rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+              aria-label="Close connection message"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <p className="text-lg font-semibold mb-2">
+              {loading ? "Connecting to vehicle..." : "Connection Error"}
+            </p>
+            <p className="text-sm mb-3">
+              {loading
+                ? "Establishing link to backend"
+                : error || "Unable to connect to vehicle data"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Make sure the backend is running at {import.meta.env.VITE_BACKEND_URL || "ws://localhost:8000"}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

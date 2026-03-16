@@ -23,7 +23,7 @@ DIST_THRESHOLD = 1.0  # meters
 
 
 # File paths
-geofence_input_path = os.path.join(base_dir, "src", "geofence.csv")
+geofence_input_path = os.path.join(base_dir, "geofence.csv")
 # geofence_output_path = os.path.join(base_dir, "dist", "geofence_converted.csv")
 # points_output_path = os.path.join(base_dir, "dist", "points_converted.csv")
 # points_latlon = os.path.join(base_dir, "dist", "points_latlon.csv")
@@ -41,13 +41,12 @@ def haversine(lat1, lon1, lat2, lon2):
     return 2 * R * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 # Background logging function
-def mavlink_logger():
-    global logging_active
+def mavlink_logger(logging_active):
 
     # Reset CSV at the start of each session
     with open(geofence_input_path, mode="w", newline="") as file:
         writer = csv.writer(file)
-        writer.writerow(["latitude", "longitude", "label", "timestamp", "fix_quality", "h_accuracy"])
+        writer.writerow(["latitude", "longitude", "label"])
 
     last_lat, last_lon = None, None
     point_count = 0

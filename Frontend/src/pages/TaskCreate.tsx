@@ -1,5 +1,3 @@
-import { cn } from "@/lib/utils";
-import { ArrowLeft } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -48,29 +46,10 @@ export default function TaskCreate() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-16 sm:pb-20 pt-3 sm:pt-4">
-      {/* Header */}
-      <header className="flex items-center gap-2 sm:gap-4 mb-4 sm:mb-6 px-2 sm:px-4">
-        <button
-          onClick={() => navigate(-1)}
-          className={cn(
-            "flex items-center justify-center w-8 sm:w-10 h-8 sm:h-10 rounded-full",
-            "bg-card/90 border border-border",
-            "text-muted-foreground hover:text-foreground hover:bg-card",
-            "transition-all duration-200 active:scale-95 flex-shrink-0"
-          )}
-        >
-          <ArrowLeft className="w-4 sm:w-5 h-4 sm:h-5" />
-        </button>
-        <h1 className="text-lg sm:text-xl font-semibold text-foreground">
-          {isEditMode ? "Edit Task" : "Create Task"}
-        </h1>
-      </header>
-
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="dashboard-panel mx-2 sm:m-0 space-y-4 sm:space-y-5">
+    <div className="pb-20 pt-4 p-4 flex flex-col">
+      <form onSubmit={handleSubmit} className="flex-1 space-y-6">
         <div className="space-y-2">
-          <Label htmlFor="name" className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+          <Label htmlFor="name" className="text-sm font-medium text-foreground">
             Name
           </Label>
           <Input
@@ -78,19 +57,19 @@ export default function TaskCreate() {
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             placeholder="Enter task name"
-            className="bg-muted/50 border-border"
+            className="h-12 bg-card border-border"
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="plot" className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+          <Label htmlFor="plot" className="text-sm font-medium text-foreground">
             Plot
           </Label>
           <Select
             value={formData.plot}
             onValueChange={(value) => setFormData({ ...formData, plot: value })}
           >
-            <SelectTrigger className="bg-muted/50 border-border">
+            <SelectTrigger className="h-12 bg-card border-border">
               <SelectValue placeholder="Select plot" />
             </SelectTrigger>
             <SelectContent>
@@ -104,7 +83,7 @@ export default function TaskCreate() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="columnSpacing" className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+          <Label htmlFor="columnSpacing" className="text-sm font-medium text-foreground">
             Column spacing (ft)
           </Label>
           <Input
@@ -114,12 +93,12 @@ export default function TaskCreate() {
             value={formData.columnSpacing}
             onChange={(e) => setFormData({ ...formData, columnSpacing: e.target.value })}
             placeholder="Enter column spacing"
-            className="bg-muted/50 border-border"
+            className="h-12 bg-card border-border"
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="rowSpacing" className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+          <Label htmlFor="rowSpacing" className="text-sm font-medium text-foreground">
             Row spacing (ft)
           </Label>
           <Input
@@ -129,12 +108,12 @@ export default function TaskCreate() {
             value={formData.rowSpacing}
             onChange={(e) => setFormData({ ...formData, rowSpacing: e.target.value })}
             placeholder="Enter row spacing"
-            className="bg-muted/50 border-border"
+            className="h-12 bg-card border-border"
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="borderPadding" className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+          <Label htmlFor="borderPadding" className="text-sm font-medium text-foreground">
             Border padding (ft)
           </Label>
           <Input
@@ -144,16 +123,13 @@ export default function TaskCreate() {
             value={formData.borderPadding}
             onChange={(e) => setFormData({ ...formData, borderPadding: e.target.value })}
             placeholder="Enter border padding"
-            className="bg-muted/50 border-border"
+            className="h-12 bg-card border-border"
           />
         </div>
 
-        <div className="pt-4">
-          <Button
-            type="submit"
-            className="w-full bg-card border border-border hover:bg-muted/50 text-foreground"
-          >
-            {isEditMode ? "Update" : "Create"}
+        <div className="flex justify-end pt-4">
+          <Button type="submit" className="px-8">
+            {isEditMode ? "Update" : "Done"}
           </Button>
         </div>
       </form>

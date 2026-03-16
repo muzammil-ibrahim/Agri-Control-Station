@@ -6,6 +6,7 @@ export interface WheelData {
 }
 
 export interface VehicleData {
+  connected: boolean;
   speed: number;
   heading: number;
   gps_status: string;
@@ -44,6 +45,14 @@ export function useVehicleData() {
           try {
             const vehicleData = JSON.parse(event.data);
             setData(vehicleData);
+
+            // if the backend reports the Pixhawk is disconnected, treat it
+            // just like a websocket failure so the UI can show an error screen
+            if (vehicleData.connected === false) {
+              setError("Vehicle disconnected");
+              // close the socket so onclose handler triggers a reconnect attempt
+              ws.close();
+            }
           } catch (err) {
             console.error("Failed to parse vehicle data:", err);
             setError("Failed to parse vehicle data");

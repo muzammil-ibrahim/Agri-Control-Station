@@ -12,7 +12,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { AppHeader } from "@/components/dashboard/AppHeader";
 
 interface Task {
   id: number;
@@ -38,9 +37,7 @@ export default function TaskList() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-16 sm:pb-20">
-      <AppHeader title="AgriControl Bot" />
-
+    <div className="pb-16 sm:pb-20 pt-4">
       <div className="px-2 sm:px-4">
 
       {/* Task Table - Responsive */}
@@ -129,11 +126,10 @@ export default function TaskList() {
         className={cn(
           "fixed bottom-24 left-1/2 -translate-x-1/2 z-40",
           "w-14 h-14 rounded-full",
-          "bg-card border-2 border-border",
+          "bg-primary text-primary-foreground",
           "flex items-center justify-center",
-          "text-foreground hover:text-primary hover:border-primary/50",
-          "transition-all duration-200 active:scale-95",
-          "shadow-lg"
+          "shadow-lg shadow-primary/30",
+          "transition-all duration-200 active:scale-95 hover:bg-primary/90"
         )}
       >
         <Plus className="w-6 h-6" />
