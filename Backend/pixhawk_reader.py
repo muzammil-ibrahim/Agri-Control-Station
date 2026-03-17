@@ -1,10 +1,22 @@
 from pymavlink import mavutil
 import asyncio
+import struct
 import time
 
-PIXHAWK_PORT = "COM10"
+PIXHAWK_PORT = "COM3"
 BAUDRATE = 57600
 
+# Sensor tunnel constants (must match onboard firmware)
+SENSOR_PAYLOAD_TYPE = 32800
+SENSOR_FMT = '<ffffffffffff'   # 12 floats: wheel_speeds[4], mag_angles[4], mag_rpms[4]
+WHEEL_KEYS = ['front_left', 'front_right', 'rear_left', 'rear_right']
+
+wheel_map = {
+    "FL": "front_left",
+    "FR": "front_right",
+    "RL": "rear_left",
+    "RR": "rear_right"
+}
 
 GPS_FIX_MAP = {
     0: "No GPS",
@@ -130,6 +142,38 @@ class PixhawkReader:
                     if msg.rssi > 0:
                         self.vehicle_state.rc_connection = True
                 
+                # ---------------- (wheel/sensor data) ----------------
+                elif msg_type == "NAMED_VALUE_FLOAT":
+
+                    try:
+                        if isinstance(msg.name, bytes):
+                            name = msg.name.decode(errors='ignore').strip('\x00')
+                        else:
+                            name = msg.name.strip('\x00')
+                        value = round(msg.value, 2)
+
+                        parts = name.split("_") 
+
+                        if len(parts) != 2:
+                            continue
+
+                        wheel_code, data_type = parts
+
+                        if wheel_code not in wheel_map:
+                            continue
+
+                        wheel_key = wheel_map[wheel_code]
+
+                        if data_type == "RPM":
+                            self.vehicle_state.wheels[wheel_key].rpm = value
+
+                        elif data_type == "ANG":
+                            self.vehicle_state.wheels[wheel_key].angle = value
+
+                    except Exception as e:
+                        print("Sensor parse error:", e)
+
+
                 # RC timeout detection
                 if time.time() - self.last_rc_update > 1.0:
                     self.vehicle_state.rc_connection = False

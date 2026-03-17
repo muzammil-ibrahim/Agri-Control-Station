@@ -20,14 +20,14 @@ vehicle_state = VehicleData(
         "B5": 0,
     },
 
-    actuator_x=100,
-    actuator_y=30,
+    actuator_x=0,
+    actuator_y=0,
 
     wheels={
-        "front_left": WheelData(rpm=20, angle=-45),
-        "front_right": WheelData(rpm=42, angle=-30),
-        "rear_left": WheelData(rpm=39, angle=45),
-        "rear_right": WheelData(rpm=41, angle=30),
+        "front_left": WheelData(rpm=0, angle=0),
+        "front_right": WheelData(rpm=0, angle=0),
+        "rear_left": WheelData(rpm=0, angle=0),
+        "rear_right": WheelData(rpm=0, angle=0),
     },
 
     four_ws_active=True

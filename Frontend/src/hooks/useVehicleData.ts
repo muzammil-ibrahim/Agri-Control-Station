@@ -23,11 +23,31 @@ export interface VehicleData {
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "ws://localhost:8000";
 
+const createDefaultVehicleData = (): VehicleData => ({
+  connected: false,
+  speed: 0,
+  heading: 0,
+  gps_status: "N/A",
+  vehicle_mode: "N/A",
+  gnss_satellites: 0,
+  camera: false,
+  rc_connection: false,
+  batteries: {},
+  actuator_x: 0,
+  actuator_y: 0,
+  wheels: {},
+  four_ws_active: false,
+});
+
 export function useVehicleData() {
-  const [data, setData] = useState<VehicleData | null>(null);
+  const [data, setData] = useState<VehicleData>(createDefaultVehicleData());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+
+  const resetDataToDefaults = () => {
+    setData(createDefaultVehicleData());
+  };
 
   useEffect(() => {
     const connectWebSocket = () => {
@@ -50,22 +70,28 @@ export function useVehicleData() {
             // just like a websocket failure so the UI can show an error screen
             if (vehicleData.connected === false) {
               setError("Vehicle disconnected");
+              resetDataToDefaults();
               // close the socket so onclose handler triggers a reconnect attempt
               ws.close();
             }
           } catch (err) {
             console.error("Failed to parse vehicle data:", err);
             setError("Failed to parse vehicle data");
+            resetDataToDefaults();
           }
         };
 
         ws.onerror = () => {
           setError("WebSocket connection error");
           setLoading(false);
+          resetDataToDefaults();
         };
 
         ws.onclose = () => {
           console.log("WebSocket disconnected, attempting to reconnect...");
+          setError((prev) => prev ?? "Backend disconnected");
+          setLoading(false);
+          resetDataToDefaults();
           setTimeout(connectWebSocket, 3000);
         };
 
@@ -74,6 +100,7 @@ export function useVehicleData() {
         console.error("WebSocket connection failed:", err);
         setError("Failed to connect to vehicle data stream");
         setLoading(false);
+        resetDataToDefaults();
       }
     };
 
