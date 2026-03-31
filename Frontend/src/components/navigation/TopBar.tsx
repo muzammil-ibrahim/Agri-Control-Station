@@ -1,9 +1,12 @@
 import { cn } from "@/lib/utils";
 import { ArrowLeft, Bell, Sun, Moon } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
+import { useNotifications } from "@/hooks/useNotifications";
 import { Switch } from "@/components/ui/switch";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useSidebar } from "./SidebarContext";
 import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
 
 interface TopBarProps {
   title?: string;
@@ -15,6 +18,31 @@ export function TopBar({ title, subtitle, backTo }: TopBarProps) {
   const { isDark, toggle } = useTheme();
   const { isOpen } = useSidebar();
   const navigate = useNavigate();
+  const { notifications, unreadCount, dismissNotifications } = useNotifications();
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [visibleNotifications, setVisibleNotifications] = useState<typeof notifications>([]);
+
+  const unreadNotificationIds = useMemo(
+    () => notifications.map((notification) => notification.id),
+    [notifications]
+  );
+
+  useEffect(() => {
+    if (!notificationOpen) {
+      setVisibleNotifications([]);
+    }
+  }, [notificationOpen]);
+
+  const handleNotificationToggle = (open: boolean) => {
+    setNotificationOpen(open);
+
+    if (open) {
+      setVisibleNotifications(notifications);
+      if (unreadNotificationIds.length > 0) {
+        dismissNotifications(unreadNotificationIds);
+      }
+    }
+  };
 
   return (
     <header
@@ -55,9 +83,52 @@ export function TopBar({ title, subtitle, backTo }: TopBarProps) {
           <Moon className="w-4 h-4 text-muted-foreground" />
         </div>
 
-        <button className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors">
-          <Bell className="w-5 h-5" />
-        </button>
+        <Popover open={notificationOpen} onOpenChange={handleNotificationToggle}>
+          <PopoverTrigger asChild>
+            <button className="relative p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors">
+              <Bell className="w-5 h-5" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-danger text-danger-foreground text-[10px] font-semibold flex items-center justify-center">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-[22rem] p-0 overflow-hidden">
+            {/* <div className="border-b border-border px-4 py-3">
+              <div className="text-sm font-semibold text-foreground">Notifications</div>
+              <div className="text-xs text-muted-foreground">Unread alerts disappear after you open this panel.</div>
+            </div> */}
+            <div className="max-h-80 overflow-y-auto">
+              {visibleNotifications.length === 0 ? (
+                <div className="px-4 py-6 text-sm text-muted-foreground text-center">No unread notifications</div>
+              ) : (
+                visibleNotifications.map((notification, index) => (
+                  <div
+                    key={notification.id}
+                    className={cn(
+                      "px-4 py-3",
+                      index !== visibleNotifications.length - 1 && "border-b border-border"
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{notification.title}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{notification.message}</p>
+                      </div>
+                      <span className="shrink-0 text-[10px] text-muted-foreground">
+                        {new Date(notification.createdAt).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
 
         <button className={cn("control-btn control-btn-emergency py-2 px-3 rounded-lg text-xs whitespace-nowrap")}>
           Emergency Stop

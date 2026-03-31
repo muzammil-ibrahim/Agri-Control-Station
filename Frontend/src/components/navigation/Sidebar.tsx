@@ -27,18 +27,17 @@ interface NavItem {
 }
 
 const navigationItems: NavItem[] = [
-  { label: "Vehicle", icon: <Map className="w-5 h-5" />, path: "/Vehicle" },
+  { label: "Vehicle", icon: <Map className="w-5 h-5" />, path: "/vehicle" },
   { label: "Tasks", icon: <Target className="w-5 h-5" />, path: "/task" },
   { label: "Fields", icon: <Leaf className="w-5 h-5" />, path: "/fields" },
-
-  { label: "Documents", icon: <FileText className="w-5 h-5" />, path: "#" },
-  {
-    label: "Inventory",
-    icon: <Users className="w-5 h-5" />,
-    path: "#",
-    badge: "Beta",
-  },
-  { label: "Farm settings", icon: <Settings className="w-5 h-5" />, path: "#" },
+  { label: "Logs", icon: <FileText className="w-5 h-5" />, path: "/logs" },
+  // {
+  //   label: "Inventory",
+  //   icon: <Users className="w-5 h-5" />,
+  //   path: "#",
+  //   badge: "Beta",
+  // },
+  // { label: "Farm settings", icon: <Settings className="w-5 h-5" />, path: "#" },
 ];
 
 export function Sidebar() {

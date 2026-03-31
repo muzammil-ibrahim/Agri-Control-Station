@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Layout } from "@/components/navigation/Layout";
 import { SidebarProvider } from "@/components/navigation/SidebarContext";
+import { NotificationProvider } from "@/hooks/useNotifications";
+import { VehicleDataProvider } from "@/hooks/useVehicleData";
 import Dashboard from "./pages/Dashboard";
 import Vehicle from "./pages/Vehicle";
 import TaskList from "./pages/TaskList";
@@ -13,6 +15,7 @@ import TaskDetail from "./pages/TaskDetail";
 import Fields from "./pages/Fields";
 import PlotCreate from "./pages/PlotCreate";
 import PlotMapping from "./pages/PlotMapping";
+import Logs from "./pages/Logs";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,24 +25,29 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
-        <SidebarProvider>
-          <Layout>
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/vehicle" element={<Vehicle />} />
-              <Route path="/task" element={<TaskList />} />
-              <Route path="/task/create" element={<TaskCreate />} />
-              <Route path="/task/edit/:id" element={<TaskCreate />} />
-              <Route path="/task/:id" element={<TaskDetail />} />
-              <Route path="/fields" element={<Fields />} />
-              <Route path="/fields/create" element={<PlotCreate />} />
-              <Route path="/fields/plot-map" element={<PlotMapping />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Layout>
-        </SidebarProvider>
-      </BrowserRouter>
+      <NotificationProvider>
+        <VehicleDataProvider>
+          <BrowserRouter>
+            <SidebarProvider>
+              <Layout>
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/vehicle" element={<Vehicle />} />
+                  <Route path="/task" element={<TaskList />} />
+                  <Route path="/task/create" element={<TaskCreate />} />
+                  <Route path="/task/edit/:id" element={<TaskCreate />} />
+                  <Route path="/task/:id" element={<TaskDetail />} />
+                  <Route path="/fields" element={<Fields />} />
+                  <Route path="/fields/create" element={<PlotCreate />} />
+                  <Route path="/fields/plot-map" element={<PlotMapping />} />
+                  <Route path="/logs" element={<Logs />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Layout>
+            </SidebarProvider>
+          </BrowserRouter>
+        </VehicleDataProvider>
+      </NotificationProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

@@ -1,5 +1,6 @@
 import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
 import { useEffect, useRef, useState,useMemo } from "react";
+import { useVehicleData } from "@/hooks/useVehicleData";
 import L, { LatLngExpression } from "leaflet";
 import vehicleIconImg from "@/assets/vehicle.png";
 import "leaflet/dist/leaflet.css";
@@ -23,10 +24,11 @@ function MoveMap({ position }: MoveMapProps) {
 
 
 export default function VehicleMap() {
+  const { data } = useVehicleData();
   const markerRef = useRef<L.Marker<any> | null>(null);
 
   const [mapType, setMapType] = useState<"street" | "satellite">("satellite");
-  const [heading, setHeading] = useState(0);
+  const heading = data.heading ?? 0;
 
   const [position, setPosition] = useState<[number, number]>([
     17.397065, 78.490267,
@@ -69,19 +71,6 @@ export default function VehicleMap() {
 
 
   useEffect(() => {
-    const ws = new WebSocket("ws://localhost:8000/ws/vehicle");
-
-    ws.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    // console.log("WebSocket data received:", data);
-
-    // Always update heading
-    if (data.heading !== undefined) {
-      setHeading(data.heading);
-      //console.log("Heading set to:", data.heading);
-    }
-
-    // Only update position with valid coordinates (not 0,0)
     if (data.lat !== undefined && data.lon !== undefined && (data.lat !== 0 || data.lon !== 0)) {
       const newPos: LatLngExpression = [data.lat, data.lon];
       setPosition(newPos);
@@ -90,8 +79,7 @@ export default function VehicleMap() {
         markerRef.current.setLatLng(newPos);
       }
     }
-  };
-}, []);
+  }, [data.lat, data.lon]);
 
 
 

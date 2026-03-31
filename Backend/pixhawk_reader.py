@@ -3,7 +3,7 @@ import asyncio
 import struct
 import time
 
-PIXHAWK_PORT = "COM3"
+PIXHAWK_PORT = "udp:0.0.0.0:14550"
 BAUDRATE = 57600
 
 # Sensor tunnel constants (must match onboard firmware)
@@ -62,7 +62,7 @@ class PixhawkReader:
                     0,0,0,0,0
                 )
 
-                print("🔋 Requested BATTERY_STATUS stream")
+                print("🔋 Requested BATTERY_STATUS stream") 
                 self.connected = True
                 # update shared state so frontend knows we're connected
                 try:

@@ -9,13 +9,16 @@ import os
 import csv
 import time
 import math
+import pandas as pd
 from datetime import datetime
 from typing import Dict, List, Optional
 
 from Vehicle_state import vehicle_state
 from pixhawk_reader import PixhawkReader
 from mission_utils import generate_mission_points, convert_points_to_latlon, clear_csv_files
-from csv_utils import CSVDataLogger, haversine, get_fix_quality_name
+from csv_utils import CSVDataLogger, haversine
+from mission_utils import Transformer, get_epsg_code        # Load geofence and setup transformer if available
+
 
 # ============================================
 # Configuration
@@ -226,25 +229,23 @@ async def get_vehicle_data():
 # ============================================
 def mavlink_logger_worker():
     """Background worker for logging MAVLink position data."""
-    global logging_active, current_state
+    global logging_active
     
-    # Initialize CSV logger
-    csv_logger = CSVDataLogger(GEOFENCE_INPUT_PATH)
+    # Start a fresh logging session in geofence.csv
+    csv_logger = CSVDataLogger(GEOFENCE_INPUT_PATH, reset=True)
     last_lat, last_lon = None, None
     point_count = 0
     
     while logging_active:
-        lat = current_state.get("lat")
-        lon = current_state.get("lon")
-        h_acc = current_state.get("h_acc")
-        fix_type = current_state.get("fix_type")
+        lat = getattr(vehicle_state, "lat", None)
+        lon = getattr(vehicle_state, "lon", None)
+        fix_quality = getattr(vehicle_state, "gps_status", "")
         
         if lat is None or lon is None:
             time.sleep(0.5)
             continue
         
         timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-        fix_quality = get_fix_quality_name(fix_type or 0)
         
         # Log if distance threshold exceeded
         if last_lat is None or haversine(last_lat, last_lon, lat, lon) >= DIST_THRESHOLD:
@@ -256,9 +257,9 @@ def mavlink_logger_worker():
                 label=label,
                 timestamp=timestamp,
                 fix_quality=fix_quality,
-                h_accuracy=h_acc
+                h_accuracy=None
             )
-            print(f"Logged {label}: {lat}, {lon}, fix={fix_quality}, acc={h_acc}m")
+            print(f"Logged {label}: {lat}, {lon}, fix={fix_quality}")
             last_lat, last_lon = lat, lon
         
         time.sleep(0.5)
@@ -266,7 +267,7 @@ def mavlink_logger_worker():
     print("Logging stopped.")
 
 
-@app.post("/start")
+@app.post("/api/start")
 async def start_logging():
     """Start logging vehicle position data."""
     global logging_active, logging_thread
@@ -280,11 +281,16 @@ async def start_logging():
     return {"status": "started"}
 
 
-@app.post("/stop")
+@app.post("/api/stop")
 async def stop_logging():
     """Stop logging vehicle position data."""
-    global logging_active
+    global logging_active, logging_thread
     logging_active = False
+
+    if logging_thread and logging_thread.is_alive():
+        logging_thread.join(timeout=2.0)
+    logging_thread = None
+
     return {"status": "stopped"}
 
 
@@ -319,11 +325,7 @@ async def websocket_location(websocket: WebSocket):
     """
     await websocket.accept()
     
-    try:
-        # Load geofence and setup transformer if available
-        from mission_utils import Transformer, get_epsg_code
-        import pandas as pd
-        
+    try:        
         transformer = None
         ref_x, ref_y = 0, 0
         

@@ -74,27 +74,33 @@ export default function PlotMapping() {
     }
   }, [error, loading, vehicleData]);
 
+  const isBackendConnected = Boolean(vehicleData?.connected) && !loading && !error;
+  const hasGpsFix = Boolean(vehicleData?.gps_status) && vehicleData.gps_status !== "No GPS" && vehicleData.gps_status !== "No Fix";
+  const hasEnoughGnssSatellites = (vehicleData?.gnss_satellites ?? 0) > 10;
+  const hasRcConnection = Boolean(vehicleData?.rc_connection);
+  const isReadyToArm = isBackendConnected && hasGpsFix && hasEnoughGnssSatellites && hasRcConnection;
+
 
   const preChecks = [
     {
       label: "Ready to Arm",
-      value: vehicleData ? (!vehicleData.rc_connection ? "Yes" : "No") : "Yes",
-      ok: vehicleData ? !vehicleData.rc_connection : true
+      value: isReadyToArm ? "Yes" : "No",
+      ok: isReadyToArm,
     },
     {
       label: "GPS",
-      value: vehicleData?.gps_status || "RTK",
-      ok: vehicleData ? vehicleData.gps_status === "RTK" : true
+      value: vehicleData?.gps_status || "No GPS",
+      ok: isBackendConnected && hasGpsFix,
     },
     {
       label: "GNSS",
-      value: vehicleData?.gnss_satellites?.toString() || "34",
-      ok: vehicleData ? vehicleData.gnss_satellites > 10 : true
+      value: vehicleData?.gnss_satellites?.toString() || "0",
+      ok: isBackendConnected && hasEnoughGnssSatellites,
     },
     {
       label: "RC Connection",
-      value: vehicleData ? (vehicleData.rc_connection ? "Connected" : "Disconnected") : "Disconnected",
-      ok: vehicleData ? vehicleData.rc_connection : false
+      value: hasRcConnection ? "Connected" : "Disconnected",
+      ok: isBackendConnected && hasRcConnection,
     },
   ];
 

@@ -4,7 +4,6 @@ import { WheelStatusInline } from "@/components/dashboard/WheelStatusInline";
 import { VehicleStatusPanel } from "@/components/dashboard/VehicleStatusPanel";
 import { BatteryStatusPanel } from "@/components/dashboard/BatteryStatusPanel";
 import { LinearActuatorPanel } from "@/components/dashboard/LinearActuatorPanel";
-import { AppHeader } from "@/components/dashboard/AppHeader";
 import { useVehicleData } from "@/hooks/useVehicleData";
 import { cn } from "@/lib/utils";
 import { Gauge, X } from "lucide-react";
@@ -32,8 +31,23 @@ export default function Vehicle() {
   }
 
   return (
-    <div className="pb-16 sm:pb-20 pt-4">
+    <div className="pb-16 sm:pb-20 pt-0">
       <div className="p-2 sm:p-4 space-y-2 sm:space-y-3">
+      <div className="flex items-center justify-end gap-2 sm:gap-3">
+        <button
+          type="button"
+          className="control-btn control-btn-start py-1.5 sm:py-2 px-3 sm:px-4 rounded-lg text-[10px] sm:text-xs"
+        >
+          RTL
+        </button>
+        <button
+          type="button"
+          className="control-btn control-btn-stop py-1.5 sm:py-2 px-3 sm:px-4 rounded-lg text-[10px] sm:text-xs"
+        >
+          Park
+        </button>
+      </div>
+
       {/* Top row: Speed, Heading, Vehicle Status - Responsive grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
         <div className="dashboard-panel flex flex-col items-center justify-center py-3 sm:py-4">
@@ -68,7 +82,7 @@ export default function Vehicle() {
           <div className="flex items-center justify-between mb-2">
             <span className="text-[8px] sm:text-xs uppercase tracking-wider text-muted-foreground font-medium">Wheel Dynamics</span>
             <span className={cn("text-[8px] sm:text-xs", data?.four_ws_active ? "text-primary" : "text-muted-foreground")}>
-              {data?.four_ws_active ? "4WS Active" : "2WS"}
+              {data?.four_ws_active ? "4WS Active" : ""}
             </span>
           </div>
           <WheelStatusInline wheels={data?.wheels ?? {}} fourWSActive={data?.four_ws_active ?? false} />

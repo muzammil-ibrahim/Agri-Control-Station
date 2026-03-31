@@ -10,10 +10,10 @@ from datetime import datetime
 class CSVDataLogger:
     """Handle logging of GPS/position data to CSV files."""
     
-    def __init__(self, filepath: str):
+    def __init__(self, filepath: str, reset: bool = False):
         self.filepath = filepath
         self.ensure_directory()
-        self.initialize_file()
+        self.initialize_file(reset=reset)
     
     def ensure_directory(self):
         """Create directory if it doesn't exist."""
@@ -21,9 +21,9 @@ class CSVDataLogger:
         if directory:
             os.makedirs(directory, exist_ok=True)
     
-    def initialize_file(self):
-        """Initialize CSV with headers if it doesn't exist."""
-        if not os.path.exists(self.filepath):
+    def initialize_file(self, reset: bool = False):
+        """Initialize CSV with headers if it doesn't exist, or reset it."""
+        if reset or not os.path.exists(self.filepath):
             with open(self.filepath, mode="w", newline="") as f:
                 writer = csv.writer(f)
                 writer.writerow(["latitude", "longitude", "label", "timestamp", "fix_quality", "h_accuracy"])
@@ -40,7 +40,7 @@ class CSVDataLogger:
     
     def clear(self):
         """Clear the CSV file and reinitialize."""
-        self.initialize_file()
+        self.initialize_file(reset=True)
     
     def get_last_point(self) -> Optional[Tuple[float, float]]:
         """Get the last logged point's coordinates."""
