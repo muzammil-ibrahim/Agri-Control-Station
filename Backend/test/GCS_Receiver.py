@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 import csv
  
-PORT = 'udp:0.0.0.0:14551'   # change if needed
+PORT = 'COM10'   # change if needed
 BAUD = 115200
 OUTPUT_CSV = Path(__file__).resolve().parent / 'received_waypoints.csv'
 
@@ -125,11 +125,13 @@ while True:
             lon = msg.y
             alt = msg.z
 
-        if is_home_placeholder(seq, lat, lon):
-            print("Seq 0 is Pixhawk home placeholder (0,0,0), skipping")
-        else:
-            waypoints.append((lat, lon))
-            print(f"Received WP {seq}: {lat}, {lon}")
+        # if is_home_placeholder(seq, lat, lon):
+        #     print("Seq 0 is Pixhawk home placeholder (0,0,0), skipping")
+        # else:
+        #     waypoints.append((lat, lon))
+        #     print(f"Received WP {seq}: {lat}, {lon}")
+        waypoints.append((lat, lon))
+        print(f"Received WP {seq}: {lat}, {lon}")
 
         if expected_count is not None:
             next_seq_to_request = seq + 1

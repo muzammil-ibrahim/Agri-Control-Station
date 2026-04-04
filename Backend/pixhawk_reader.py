@@ -1,10 +1,37 @@
 from pymavlink import mavutil
+import threading
 import asyncio
 import struct
 import time
 
-PIXHAWK_PORT = "udp:0.0.0.0:14550"
+PIXHAWK_PORT = "COM3"
 BAUDRATE = 57600
+
+_shared_master = None
+_mission_transfer_in_progress = False
+_connection_lock = threading.RLock()
+
+
+def set_shared_master(master):
+    global _shared_master
+    _shared_master = master
+
+
+def get_shared_master():
+    return _shared_master
+
+
+def set_mission_transfer_in_progress(value: bool):
+    global _mission_transfer_in_progress
+    _mission_transfer_in_progress = value
+
+
+def is_mission_transfer_in_progress():
+    return _mission_transfer_in_progress
+
+
+def get_connection_lock():
+    return _connection_lock
 
 # Sensor tunnel constants (must match onboard firmware)
 SENSOR_PAYLOAD_TYPE = 32800
@@ -30,7 +57,7 @@ GPS_FIX_MAP = {
 
 
 class PixhawkReader:
-
+ 
     def __init__(self, vehicle_state):
         self.vehicle_state = vehicle_state
         self.master = None
@@ -64,6 +91,7 @@ class PixhawkReader:
 
                 print("🔋 Requested BATTERY_STATUS stream") 
                 self.connected = True
+                set_shared_master(self.master)
                 # update shared state so frontend knows we're connected
                 try:
                     self.vehicle_state.connected = True
@@ -74,6 +102,7 @@ class PixhawkReader:
             except Exception as e:
                 print(f"❌ Pixhawk not found: {e}")
                 self.connected = False
+                set_shared_master(None)
                 # inform frontend we are disconnected
                 try:
                     self.vehicle_state.connected = False
@@ -89,8 +118,13 @@ class PixhawkReader:
             if not self.connected:
                 await self.connect()
 
+            if is_mission_transfer_in_progress():
+                await asyncio.sleep(0.05)
+                continue
+
             try:
-                msg = self.master.recv_match(blocking=False)
+                with _connection_lock:
+                    msg = self.master.recv_match(blocking=False)
 
                 if msg is None:
                     await asyncio.sleep(0.01)
@@ -182,6 +216,7 @@ class PixhawkReader:
             except Exception as e:
                 print("⚠️ Connection lost:", e)
                 self.connected = False
+                set_shared_master(None)
                 # signal disconnected state to frontend
                 try:
                     self.vehicle_state.connected = False

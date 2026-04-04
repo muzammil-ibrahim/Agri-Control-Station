@@ -1,16 +1,51 @@
-import { supabase } from "@/integrations/supabase/client";
+// Local API Client - Replaces Supabase
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
+
+type ApiError = { message: string };
+type ApiResult<T> = { data: T | null; error: ApiError | null };
+
+interface RequestOptions {
+  method?: "GET" | "POST" | "PUT" | "DELETE";
+  body?: any;
+}
+
+async function apiRequest<T>(endpoint: string, options: RequestOptions = {}): Promise<ApiResult<T>> {
+  const url = `${API_BASE_URL}${endpoint}`;
+  const { method = "GET", body } = options;
+
+  try {
+    const response = await fetch(url, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      return { data: null, error: { message: error.detail || `HTTP ${response.status}` } };
+    }
+
+    const data = (await response.json()) as T;
+    return { data, error: null };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return { data: null, error: { message } };
+  }
+}
 
 // =====================
 // FARMS
 // =====================
 export const farmsApi = {
-  list: () => supabase.from("farms").select("*").order("created_at"),
-  get: (id: number) => supabase.from("farms").select("*").eq("id", id).single(),
+  list: () => apiRequest("/farms"),
+  get: (id: number) => apiRequest(`/farms/${id}`),
   create: (data: { name: string; center_lat?: number; center_lng?: number; geo_file_url?: string }) =>
-    supabase.from("farms").insert(data).select().single(),
+    apiRequest("/farms", { method: "POST", body: data }),
   update: (id: number, data: Partial<{ name: string; center_lat: number; center_lng: number }>) =>
-    supabase.from("farms").update(data).eq("id", id).select().single(),
-  delete: (id: number) => supabase.from("farms").delete().eq("id", id),
+    apiRequest(`/farms/${id}`, { method: "PUT", body: data }),
+  delete: (id: number) => apiRequest(`/farms/${id}`, { method: "DELETE" }),
 };
 
 // =====================
@@ -18,27 +53,58 @@ export const farmsApi = {
 // =====================
 export const fieldsApi = {
   list: (farmId?: number) => {
-    let q = supabase.from("fields").select("*").order("created_at");
-    if (farmId) q = q.eq("farm_id", farmId);
-    return q;
+    const params = farmId ? `?farm_id=${farmId}` : "";
+    return apiRequest(`/fields${params}`);
   },
-  get: (id: number) => supabase.from("fields").select("*").eq("id", id).single(),
+  get: (id: number) => apiRequest(`/fields/${id}`),
   create: (data: { farm_id: number; name: string; area_hectares?: number; soil_type?: string }) =>
-    supabase.from("fields").insert(data).select().single(),
+    apiRequest("/fields", { method: "POST", body: data }),
   update: (id: number, data: Partial<{ name: string; area_hectares: number; soil_type: string }>) =>
-    supabase.from("fields").update(data).eq("id", id).select().single(),
-  delete: (id: number) => supabase.from("fields").delete().eq("id", id),
+    apiRequest(`/fields/${id}`, { method: "PUT", body: data }),
+  delete: (id: number) => apiRequest(`/fields/${id}`, { method: "DELETE" }),
+  createWithCsv: async (data: {
+    farm_id: number;
+    name: string;
+    area_hectares?: number;
+    soil_type?: string;
+    csv_file: File;
+  }) => {
+    try {
+      const formData = new FormData();
+      formData.append("farm_id", String(data.farm_id));
+      formData.append("name", data.name);
+      if (data.area_hectares !== undefined) formData.append("area_hectares", String(data.area_hectares));
+      if (data.soil_type) formData.append("soil_type", data.soil_type);
+      formData.append("csv_file", data.csv_file);
+
+      const response = await fetch(`${API_BASE_URL}/fields/upload-csv`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        return { data: null, error: { message: error.detail || `HTTP ${response.status}` } };
+      }
+
+      const payload = await response.json();
+      return { data: payload, error: null };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Network error";
+      return { data: null, error: { message } };
+    }
+  },
 };
 
 // =====================
 // GEO POINTS
 // =====================
 export const geoPointsApi = {
-  listByField: (fieldId: number) =>
-    supabase.from("geo_points").select("*").eq("field_id", fieldId).order("sequence_order"),
+  listByField: (fieldId: number) => apiRequest(`/fields/${fieldId}/geo-points`),
+  geofenceStatus: (fieldId: number) => apiRequest(`/fields/${fieldId}/geofence-status`),
   bulkSave: async (fieldId: number, points: { lat: number; lng: number; sequence_order: number }[]) => {
-    await supabase.from("geo_points").delete().eq("field_id", fieldId);
-    return supabase.from("geo_points").insert(points.map((p) => ({ ...p, field_id: fieldId }))).select();
+    const pointsData = points.map((p) => ({ ...p, field_id: fieldId }));
+    return apiRequest(`/fields/${fieldId}/geo-points/bulk`, { method: "POST", body: pointsData });
   },
 };
 
@@ -46,22 +112,20 @@ export const geoPointsApi = {
 // CROP SEASONS
 // =====================
 export const cropSeasonsApi = {
-  listByField: (fieldId: number) =>
-    supabase.from("crop_seasons").select("*").eq("field_id", fieldId).order("sowing_date", { ascending: false }),
-  getActive: (fieldId: number) =>
-    supabase.from("crop_seasons").select("*").eq("field_id", fieldId).eq("status", "active").maybeSingle(),
+  listByField: (fieldId: number) => apiRequest(`/fields/${fieldId}/crop-seasons`),
+  getActive: (fieldId: number) => apiRequest(`/fields/${fieldId}/crop-seasons/active`),
   create: (data: { field_id: number; crop_type: string; variety?: string; sowing_date?: string; expected_harvest?: string; growth_stage?: string }) =>
-    supabase.from("crop_seasons").insert({ ...data, status: "active" }).select().single(),
+    apiRequest("/crop-seasons", { method: "POST", body: data }),
   update: (id: number, data: Partial<{ growth_stage: string; status: string; actual_harvest_date: string }>) =>
-    supabase.from("crop_seasons").update(data).eq("id", id).select().single(),
+    apiRequest(`/crop-seasons/${id}`, { method: "PUT", body: data }),
 };
 
 // =====================
 // VEHICLES
 // =====================
 export const vehiclesApi = {
-  list: () => supabase.from("vehicles").select("*"),
-  get: (id: number) => supabase.from("vehicles").select("*").eq("id", id).single(),
+  list: () => apiRequest("/vehicles"),
+  get: (id: number) => apiRequest(`/vehicles/${id}`),
 };
 
 // =====================
@@ -69,38 +133,49 @@ export const vehiclesApi = {
 // =====================
 export const tasksApi = {
   list: (filters?: { field_id?: number; status?: string; task_type?: string }) => {
-    let q = supabase.from("tasks").select("*, fields(name), vehicles(name)").order("scheduled_at");
-    if (filters?.field_id) q = q.eq("field_id", filters.field_id);
-    if (filters?.status) q = q.eq("status", filters.status);
-    if (filters?.task_type) q = q.eq("task_type", filters.task_type);
-    return q;
+    const params = new URLSearchParams();
+    if (filters?.field_id) params.append("field_id", filters.field_id.toString());
+    if (filters?.status) params.append("status", filters.status);
+    if (filters?.task_type) params.append("task_type", filters.task_type);
+    const query = params.toString() ? `?${params.toString()}` : "";
+    return apiRequest(`/tasks${query}`);
   },
-  get: (id: number) => supabase.from("tasks").select("*, fields(name), vehicles(name)").eq("id", id).single(),
+  get: (id: number) => apiRequest(`/tasks/${id}`),
+  getVisualizationData: (id: number) => apiRequest<{
+    task_id: number;
+    field_id: number;
+    geofence: Array<{ x: number; y: number }>;
+    points: Array<{ x: number; y: number }>;
+    reference?: { epsg?: string };
+  }>(`/tasks/${id}/visualization-data`),
+  startMission: (id: number) => apiRequest<{ status: string; task_id: number; waypoints: number; message: string }>(
+    `/tasks/${id}/start-mission`,
+    { method: "POST" }
+  ),
   create: (data: {
     field_id: number; vehicle_id?: number; task_type: string;
     target_quantity?: number; unit?: string; scheduled_at?: string; recurrence_rule?: string;
-  }) => supabase.from("tasks").insert(data).select().single(),
+  }) => apiRequest("/tasks", { method: "POST", body: data }),
   update: (id: number, data: Partial<{
     field_id: number; vehicle_id: number; task_type: string;
     target_quantity: number; unit: string; scheduled_at: string; recurrence_rule: string; status: string;
-  }>) => supabase.from("tasks").update(data).eq("id", id).select().single(),
-  delete: (id: number) => supabase.from("tasks").delete().eq("id", id),
+  }>) => apiRequest(`/tasks/${id}`, { method: "PUT", body: data }),
+  delete: (id: number) => apiRequest(`/tasks/${id}`, { method: "DELETE" }),
 };
 
 // =====================
 // TASK EXECUTIONS
 // =====================
 export const taskExecutionsApi = {
-  listByTask: (taskId: number) =>
-    supabase.from("task_executions").select("*").eq("task_id", taskId).order("started_at", { ascending: false }),
+  listByTask: (taskId: number) => apiRequest(`/tasks/${taskId}/executions`),
 };
 
 // =====================
 // ALERTS
 // =====================
 export const alertsApi = {
-  listUnresolved: () => supabase.from("alerts").select("*").eq("resolved", false).order("created_at", { ascending: false }),
-  resolve: (id: number) => supabase.from("alerts").update({ resolved: true }).eq("id", id),
+  listUnresolved: () => apiRequest("/alerts/unresolved"),
+  resolve: (id: number) => apiRequest(`/alerts/${id}/resolve`, { method: "PUT" }),
 };
 
 // =====================
@@ -108,60 +183,61 @@ export const alertsApi = {
 // =====================
 export const cropLogsApi = {
   list: (filters?: { field_id?: number; log_type?: string; is_auto_generated?: boolean }) => {
-    let q = supabase.from("crop_logs").select("*, fields(name), crop_seasons(crop_type, variety), crop_log_tags(log_tags(name, color))").order("logged_at", { ascending: false });
-    if (filters?.field_id) q = q.eq("field_id", filters.field_id);
-    if (filters?.log_type) q = q.eq("log_type", filters.log_type);
-    if (filters?.is_auto_generated !== undefined) q = q.eq("is_auto_generated", filters.is_auto_generated);
-    return q;
+    const params = new URLSearchParams();
+    if (filters?.field_id) params.append("field_id", filters.field_id.toString());
+    if (filters?.log_type) params.append("log_type", filters.log_type);
+    if (filters?.is_auto_generated !== undefined) params.append("is_auto_generated", filters.is_auto_generated.toString());
+    const query = params.toString() ? `?${params.toString()}` : "";
+    return apiRequest(`/crop-logs${query}`);
   },
-  get: (id: number) => supabase.from("crop_logs").select("*").eq("id", id).single(),
+  get: (id: number) => apiRequest(`/crop-logs/${id}`),
   create: (data: {
     field_id: number; crop_season_id?: number; log_type: string;
     title: string; notes?: string; logged_by?: string; is_auto_generated?: boolean;
-  }) => supabase.from("crop_logs").insert(data).select().single(),
-  delete: (id: number) => supabase.from("crop_logs").delete().eq("id", id),
+  }) => apiRequest("/crop-logs", { method: "POST", body: data }),
+  delete: (id: number) => apiRequest(`/crop-logs/${id}`, { method: "DELETE" }),
 };
 
 // Sub-type detail fetchers
 export const growthObservationsApi = {
-  getByLog: (logId: number) => supabase.from("growth_observations").select("*").eq("crop_log_id", logId).maybeSingle(),
+  getByLog: (logId: number) => apiRequest(`/crop-logs/${logId}/growth-observation`),
   create: (data: { crop_log_id: number; plant_height_cm?: number; leaf_count?: number; bbch_stage?: string; canopy_cover_pct?: number; vigor_rating?: string }) =>
-    supabase.from("growth_observations").insert(data).select().single(),
+    apiRequest("/growth-observations", { method: "POST", body: data }),
 };
 
 export const pestRecordsApi = {
-  getByLog: (logId: number) => supabase.from("pest_records").select("*").eq("crop_log_id", logId).maybeSingle(),
+  getByLog: (logId: number) => apiRequest(`/crop-logs/${logId}/pest-record`),
   create: (data: { crop_log_id: number; pest_name?: string; pest_category?: string; severity?: string; affected_area_pct?: number; recommended_action?: string; treatment_done?: boolean }) =>
-    supabase.from("pest_records").insert(data).select().single(),
+    apiRequest("/pest-records", { method: "POST", body: data }),
 };
 
 export const diseaseRecordsApi = {
-  getByLog: (logId: number) => supabase.from("disease_records").select("*").eq("crop_log_id", logId).maybeSingle(),
+  getByLog: (logId: number) => apiRequest(`/crop-logs/${logId}/disease-record`),
   create: (data: { crop_log_id: number; disease_name?: string | null; severity?: string | null }) =>
-    supabase.from("disease_records").insert(data).select().single(),
+    apiRequest("/disease-records", { method: "POST", body: data }),
 };
 
 export const soilTestsApi = {
-  getByLog: (logId: number) => supabase.from("soil_tests").select("*").eq("crop_log_id", logId).maybeSingle(),
+  getByLog: (logId: number) => apiRequest(`/crop-logs/${logId}/soil-test`),
   create: (data: { crop_log_id: number; ph?: number; nitrogen_ppm?: number; phosphorus_ppm?: number; potassium_ppm?: number; moisture_pct?: number; organic_matter_pct?: number; temp_celsius?: number; ec_ds_per_m?: number }) =>
-    supabase.from("soil_tests").insert(data).select().single(),
+    apiRequest("/soil-tests", { method: "POST", body: data }),
 };
 
 export const treatmentRecordsApi = {
-  getByLog: (logId: number) => supabase.from("treatment_records").select("*").eq("crop_log_id", logId).maybeSingle(),
+  getByLog: (logId: number) => apiRequest(`/crop-logs/${logId}/treatment-record`),
   create: (data: { crop_log_id: number; product_name?: string; treatment_type?: string; dose_per_ha?: number; total_quantity?: number; unit?: string; application_method?: string; weather_conditions?: string }) =>
-    supabase.from("treatment_records").insert(data).select().single(),
+    apiRequest("/treatment-records", { method: "POST", body: data }),
 };
 
 export const harvestRecordsApi = {
-  getByLog: (logId: number) => supabase.from("harvest_records").select("*").eq("crop_log_id", logId).maybeSingle(),
+  getByLog: (logId: number) => apiRequest(`/crop-logs/${logId}/harvest-record`),
   create: (data: { crop_log_id: number; yield_kg?: number; harvested_area_ha?: number; yield_per_ha?: number; quality_grade?: string; moisture_content_pct?: number; storage_location?: string }) =>
-    supabase.from("harvest_records").insert(data).select().single(),
+    apiRequest("/harvest-records", { method: "POST", body: data }),
 };
 
 // =====================
 // LOG TAGS
 // =====================
 export const logTagsApi = {
-  list: () => supabase.from("log_tags").select("*").order("name"),
+  list: () => apiRequest("/log-tags"),
 };

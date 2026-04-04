@@ -175,6 +175,61 @@ def convert_points_to_latlon(
         raise RuntimeError(f"Conversion failed: {e}")
 
 
+def transform_latlon_lists_to_xy(
+    geofence_latlon: List[Dict[str, float]],
+    points_latlon: List[Dict[str, float]],
+) -> Dict:
+    """
+    Transform geofence and mission points from lat/lon to field-relative XY.
+
+    This uses the same projection and reference-point logic as generate_mission_points
+    so visualization coordinates match mission generation behavior.
+    """
+    if not geofence_latlon:
+        return {"status": "error", "message": "Geofence points are required"}
+
+    try:
+        df_geofence = pd.DataFrame(geofence_latlon)
+        if "latitude" not in df_geofence.columns or "longitude" not in df_geofence.columns:
+            raise ValueError("Geofence points must contain latitude and longitude")
+
+        mean_lon = df_geofence["longitude"].mean()
+        mean_lat = df_geofence["latitude"].mean()
+        epsg_code = get_epsg_code(mean_lat, mean_lon)
+        transformer = Transformer.from_crs("EPSG:4326", epsg_code, always_xy=True)
+
+        ref_lat = df_geofence["latitude"].min()
+        ref_lon = df_geofence["longitude"].min()
+        ref_x, ref_y = transformer.transform(ref_lon, ref_lat)
+
+        g_x_m, g_y_m = transformer.transform(df_geofence["longitude"].values, df_geofence["latitude"].values)
+        geofence_xy = [
+            {"x": float((x_m - ref_x) * 100), "y": float((y_m - ref_y) * 100)}
+            for x_m, y_m in zip(g_x_m, g_y_m)
+        ]
+
+        points_xy: List[Dict[str, float]] = []
+        if points_latlon:
+            df_points = pd.DataFrame(points_latlon)
+            if "latitude" not in df_points.columns or "longitude" not in df_points.columns:
+                raise ValueError("Mission points must contain latitude and longitude")
+
+            p_x_m, p_y_m = transformer.transform(df_points["longitude"].values, df_points["latitude"].values)
+            points_xy = [
+                {"x": float((x_m - ref_x) * 100), "y": float((y_m - ref_y) * 100)}
+                for x_m, y_m in zip(p_x_m, p_y_m)
+            ]
+
+        return {
+            "status": "success",
+            "geofence": geofence_xy,
+            "points": points_xy,
+            "reference": {"epsg": epsg_code},
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
 def clear_csv_files(file_paths: List[str]):
     """Clear CSV files by writing empty headers."""
     for file_path in file_paths:

@@ -28,4 +28,8 @@ typing_extensions==4.15.0
 tzdata==2025.3
 uvicorn==0.41.0
 websockets==16.0
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
+python-dotenv==1.2.1
+alembic==1.13.1
 win32_setctime==1.2.0

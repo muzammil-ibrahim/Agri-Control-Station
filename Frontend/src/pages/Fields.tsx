@@ -10,6 +10,7 @@ const GROWTH_STAGES = ["Germination", "Seedling", "Vegetative", "Flowering", "Fr
 
 interface FieldWithSeason {
   id: number;
+  farm_id: number;
   name: string;
   area_hectares: number | null;
   soil_type: string | null;
@@ -20,6 +21,21 @@ interface FieldWithSeason {
     expected_harvest: string | null;
     status: string;
   };
+}
+
+interface FarmEntity {
+  id: number;
+  name: string;
+  center_lat: number | null;
+  center_lng: number | null;
+}
+
+interface CropSeasonEntity {
+  crop_type: string;
+  variety: string | null;
+  growth_stage: string | null;
+  expected_harvest: string | null;
+  status: string;
 }
 
 function GrowthStageProgress({ currentStage }: { currentStage: string }) {
@@ -47,19 +63,23 @@ export default function Fields() {
   useEffect(() => {
     async function load() {
       const { data: farms } = await farmsApi.list();
-      if (!farms || farms.length === 0) { setLoading(false); return; }
-      const selectedFarm = farms[0];
+      const farmRows = (Array.isArray(farms) ? farms : []) as FarmEntity[];
+      if (farmRows.length === 0) { setLoading(false); return; }
+
+      const selectedFarm = farmRows[0];
       setFarm(selectedFarm);
 
       const { data: fieldRows } = await fieldsApi.list(selectedFarm.id);
-      if (!fieldRows) { setLoading(false); return; }
+      const typedFieldRows = (Array.isArray(fieldRows) ? fieldRows : []) as FieldWithSeason[];
+      if (typedFieldRows.length === 0) { setFields([]); setLoading(false); return; }
 
       const withSeasons: FieldWithSeason[] = await Promise.all(
-        fieldRows.map(async (f) => {
+        typedFieldRows.map(async (f) => {
           const { data: season } = await cropSeasonsApi.getActive(f.id);
+          const typedSeason = (season as CropSeasonEntity | null) || null;
           return {
             ...f,
-            activeSeason: season || undefined,
+            activeSeason: typedSeason || undefined,
           };
         })
       );
@@ -98,7 +118,20 @@ export default function Fields() {
   }
 
   if (!farm) {
-    return <div className="text-center text-muted-foreground py-20">No farms found. Create one to get started.</div>;
+    return (
+      <div className="relative min-h-[40vh]">
+        <div className="text-center text-muted-foreground py-20">No farms found. Create one to get started.</div>
+        <button
+          onClick={() => navigate("/fields/plot-map")}
+          className={cn(
+            "fixed bottom-8 right-8 z-40 w-14 h-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/30 transition-all duration-200 active:scale-95 hover:bg-primary/90"
+          )}
+          aria-label="Add field"
+        >
+          <Plus size={24} />
+        </button>
+      </div>
+    );
   }
 
   const totalArea = fields.reduce((sum, f) => sum + (f.area_hectares || 0), 0);

@@ -16,7 +16,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { cropLogsApi, growthObservationsApi, pestRecordsApi, diseaseRecordsApi, soilTestsApi, treatmentRecordsApi, harvestRecordsApi } from "@/lib/api";
+import { cropLogsApi, growthObservationsApi, pestRecordsApi, diseaseRecordsApi, soilTestsApi, treatmentRecordsApi, harvestRecordsApi, fieldsApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import AddLogDialog from "@/components/logs/AddLogDialog";
 
@@ -32,6 +32,11 @@ interface CropLogRow {
   fields: { name: string } | null;
   crop_seasons: { crop_type: string; variety: string | null } | null;
   crop_log_tags: { log_tags: { name: string; color: string | null } | null }[];
+}
+
+interface NamedEntity {
+  id: number;
+  name: string;
 }
 
 const logTypeIcons: Record<string, any> = {
@@ -96,8 +101,27 @@ export default function Logs() {
 
   const loadLogs = async () => {
     setLoading(true);
-    const { data } = await cropLogsApi.list();
-    setLogs((data as unknown as CropLogRow[]) || []);
+    const [logsRes, fieldsRes] = await Promise.all([
+      cropLogsApi.list(),
+      fieldsApi.list(),
+    ]);
+
+    if (logsRes.error) {
+      toast({ title: "Error loading logs", description: logsRes.error.message, variant: "destructive" });
+      setLoading(false);
+      return;
+    }
+
+    const fieldRows = (Array.isArray(fieldsRes.data) ? fieldsRes.data : []) as NamedEntity[];
+    const fieldNameById = new Map<number, string>(fieldRows.map((f) => [f.id, f.name]));
+
+    const rawLogs = (Array.isArray(logsRes.data) ? logsRes.data : []) as CropLogRow[];
+    const enrichedLogs: CropLogRow[] = rawLogs.map((l) => ({
+      ...l,
+      fields: l.fields ?? (fieldNameById.has(l.field_id) ? { name: fieldNameById.get(l.field_id)! } : null),
+    }));
+
+    setLogs(enrichedLogs);
     setLoading(false);
   };
 

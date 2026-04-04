@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { useVehicleData } from "@/hooks/useVehicleData";
 import { useToast } from "@/hooks/use-toast";
+import { tasksApi } from "@/lib/api";
 
 interface MapPoint {
   id: string;
@@ -21,27 +22,21 @@ interface MapPoint {
   y: number;
 }
 
-// Mock task data
-const tasksData: Record<string, { name: string; plot: string; progress: number; status: string }> = {
-  "1": { name: "Seedling planting", plot: "Plot A", progress: 0, status: "pending" },
-  "2": { name: "Fertilizer spray", plot: "Plot B", progress: 50, status: "active" },
-  "3": { name: "Harvesting wheat", plot: "Plot C", progress: 100, status: "completed" },
-};
-
-// Mock log entries
-const logEntries = [
-  { time: "05:36:26", message: "Task initialized successfully" },
-  { time: "05:36:30", message: "Vehicle connected to GPS" },
-  { time: "05:37:15", message: "Starting path calculation" },
-  { time: "05:38:02", message: "Navigation started" },
-];
+interface TaskDetailData {
+  id: number;
+  field_id: number;
+  task_type: string;
+  status: string;
+}
 
 export default function TaskDetail() {
   const { id } = useParams();
-  const task = id ? tasksData[id] : null;
+  const [task, setTask] = useState<TaskDetailData | null>(null);
+  const [taskLoading, setTaskLoading] = useState(true);
   const [isArmed, setIsArmed] = useState(false);
   const [vehicleMode, setVehicleMode] = useState("AUTO");
   const [isStarted, setIsStarted] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const { data: vehicleData, yaw, tractorPos, loading, error } = useVehicleData();
   const { toast } = useToast();
@@ -52,60 +47,56 @@ export default function TaskDetail() {
   const [drilledPoints, setDrilledPoints] = useState<string[]>([]);
   const [isOverlayDismissed, setIsOverlayDismissed] = useState(false);
 
-  // Fetch CSV data
-  const fetchCSVData = () => {
-    // Use HTTP for CSV endpoints, WS only for real-time data
-    const httpUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
-    const baseUrl = httpUrl.replace("ws://", "http://").replace("wss://", "https://");
-    
-    Promise.all([
-      fetch(`${baseUrl}/get_csv`).then((res) => res.text()).catch(() => ""),
-      fetch(`${baseUrl}/get_csv1`).then((res) => res.text()).catch(() => ""),
-    ]).then(([geofenceCSV, pointsCSV]) => {
-      // Simple CSV parser
-      const parseCSV = (csv: string): any[] => {
-        const lines = csv.trim().split("\n");
-        if (lines.length < 2) return [];
-        
-        const headers = lines[0].split(",").map((h) => h.trim());
-        return lines.slice(1).map((line) => {
-          const values = line.split(",").map((v) => v.trim());
-          const obj: any = {};
-          headers.forEach((h, i) => {
-            obj[h] = values[i];
-          });
-          return obj;
-        });
-      };
-
-      if (geofenceCSV) {
-        const parsed = parseCSV(geofenceCSV);
-        setGeofence(
-          parsed.map((r: any, i: number) => ({
-            id: r.id ?? String(i + 1),
-            x: +r.x || 0,
-            y: +r.y || 0,
-          }))
-        );
-      }
-
-      if (pointsCSV) {
-        const parsed = parseCSV(pointsCSV);
-        setPoints(
-          parsed.map((r: any, i: number) => ({
-            id: r.id ?? String(i + 1),
-            x: +r.x || 0,
-            y: +r.y || 0,
-          }))
-        );
-      }
-    });
-  };
-
-  // Fetch CSV data on mount
   useEffect(() => {
-    fetchCSVData();
-  }, []);
+    const loadTask = async () => {
+      if (!id) {
+        setTaskLoading(false);
+        return;
+      }
+      const { data, error } = await tasksApi.get(Number(id));
+      if (error || !data) {
+        setTask(null);
+      } else {
+        setTask(data as TaskDetailData);
+      }
+      setTaskLoading(false);
+    };
+    loadTask();
+  }, [id]);
+
+  useEffect(() => {
+    const loadTaskMapData = async () => {
+      if (!id) return;
+
+      const taskId = Number(id);
+      if (!Number.isFinite(taskId)) return;
+
+      const { data, error } = await tasksApi.getVisualizationData(taskId);
+      if (error || !data) {
+        setGeofence([]);
+        setPoints([]);
+        return;
+      }
+
+      setGeofence(
+        (data.geofence || []).map((p, i) => ({
+          id: String(i + 1),
+          x: Number(p.x) || 0,
+          y: Number(p.y) || 0,
+        }))
+      );
+
+      setPoints(
+        (data.points || []).map((p, i) => ({
+          id: String(i + 1),
+          x: Number(p.x) || 0,
+          y: Number(p.y) || 0,
+        }))
+      );
+    };
+
+    loadTaskMapData();
+  }, [id]);
 
   useEffect(() => {
     if (!error && !loading && vehicleData) {
@@ -147,18 +138,43 @@ export default function TaskDetail() {
   const allChecksReady = preChecks.every(check => check.ok);
   const failingChecks = preChecks.filter(check => !check.ok);
 
-  const handleArmClick = () => {
-    if (!allChecksReady) {
-      const failingList = failingChecks.map(check => check.label).join(", ");
+  const handleStartClick = async () => {
+    if (!id) {
+      return;
+    }
+
+    setIsStarting(true);
+    const taskId = Number(id);
+    const { data, error } = await tasksApi.startMission(taskId);
+    setIsStarting(false);
+
+    if (error || !data) {
       toast({
-        title: "Cannot Arm Vehicle",
-        description: `The following checks are not ready: ${failingList}`,
+        title: "Start Failed",
+        description: error?.message || "Unable to start task mission.",
         variant: "destructive",
       });
       return;
     }
+
+    setIsStarted(true);
+    toast({
+      title: "Mission Upload Started",
+      description: `${data.waypoints} waypoints are being sent to the vehicle.`,
+    });
+  };
+
+  const handleArmClick = () => {
     setIsArmed(!isArmed);
   };
+
+  if (taskLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <p className="text-muted-foreground">Loading task...</p>
+      </div>
+    );
+  }
 
   if (!task) {
     return (
@@ -167,6 +183,15 @@ export default function TaskDetail() {
       </div>
     );
   }
+
+  const progressByStatus: Record<string, number> = {
+    pending: 0,
+    active: 50,
+    completed: 100,
+    cancelled: 0,
+    paused: 50,
+  };
+  const progress = progressByStatus[task.status] ?? 0;
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden">
@@ -226,8 +251,9 @@ export default function TaskDetail() {
           {/* Controls below camera */}
           <div className="p-3 space-y-2">
             {!isStarted ? (
-              <Button className="w-full" onClick={() => setIsStarted(true)}>
-                Start
+              <Button className="w-full" onClick={handleStartClick}>
+                {/* disabled={!canStartTask || isStarting} */}
+                {isStarting ? "Starting..." : "Start"}
               </Button>
             ) : (
               <div className="flex gap-2">
@@ -273,13 +299,13 @@ export default function TaskDetail() {
             </span>
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-muted-foreground">Completion</span>
-              <span className="text-sm font-mono text-primary">{task.progress}%</span>
+              <span className="text-sm font-mono text-primary">{progress}%</span>
             </div>
-            <Progress value={task.progress} className="h-2 mb-3" />
+            <Progress value={progress} className="h-2 mb-3" />
             <div className="flex flex-col gap-2 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Plot</span>
-                <span className="text-foreground font-medium font-mono">{task.plot}</span>
+                <span className="text-foreground font-medium font-mono">Field #{task.field_id}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Time</span>
@@ -294,16 +320,9 @@ export default function TaskDetail() {
               Log
             </span>
             <div className="flex-1 overflow-y-auto space-y-2 scrollbar-hide">
-              {logEntries.map((entry, index) => (
-                <div
-                  key={index}
-                  className="text-xs font-mono text-muted-foreground bg-muted/30 rounded-lg px-3 py-2"
-                >
-                  <span className="text-primary">{entry.time}</span>
-                  <span className="mx-2">→</span>
-                  <span>{entry.message}</span>
-                </div>
-              ))}
+              <div className="text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-2">
+                No task events available.
+              </div>
             </div>
           </div>
         </div>

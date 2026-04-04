@@ -17,7 +17,9 @@ from Vehicle_state import vehicle_state
 from pixhawk_reader import PixhawkReader
 from mission_utils import generate_mission_points, convert_points_to_latlon, clear_csv_files
 from csv_utils import CSVDataLogger, haversine
-from mission_utils import Transformer, get_epsg_code        # Load geofence and setup transformer if available
+from mission_utils import Transformer, get_epsg_code
+from database import init_db, apply_schema_patches
+from api_routes import router as api_router
 
 
 # ============================================
@@ -57,15 +59,21 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:8080",
+        "http://localhost:5173",
         "http://localhost:3000",
         "http://127.0.0.1:8080",
+        "http://127.0.0.1:5173",
         "http://127.0.0.1:3000",
         "http://0.0.0.0:8080",
+        "http://0.0.0.0:5173",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include API routes
+app.include_router(api_router)
 
 # ============================================
 # Mission Generation Endpoints
@@ -206,10 +214,13 @@ async def vehicle_ws(websocket: WebSocket):
 @app.on_event("startup")
 async def startup_event():
     global pixhawk
+    
+    # Initialize database tables
+    init_db()
+    apply_schema_patches()
+    print("Database initialized successfully")
 
     pixhawk = PixhawkReader(vehicle_state)
-    pixhawk.connect()
-
     asyncio.create_task(pixhawk.read_loop())
 
 

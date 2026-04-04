@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { tasksApi, taskExecutionsApi } from "@/lib/api";
+import { tasksApi, taskExecutionsApi, fieldsApi, vehiclesApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -26,6 +26,11 @@ interface TaskRow {
   status: string;
   fields: { name: string } | null;
   vehicles: { name: string } | null;
+}
+
+interface NamedEntity {
+  id: number;
+  name: string;
 }
 
 interface Execution {
@@ -79,9 +84,30 @@ export default function TaskList() {
   const [filterStatus, setFilterStatus] = useState("all");
 
   const loadTasks = async () => {
-    const { data, error } = await tasksApi.list();
-    if (error) { toast({ title: "Error loading tasks", description: error.message, variant: "destructive" }); return; }
-    setTasks((data as unknown as TaskRow[]) || []);
+    const [tasksRes, fieldsRes, vehiclesRes] = await Promise.all([
+      tasksApi.list(),
+      fieldsApi.list(),
+      vehiclesApi.list(),
+    ]);
+
+    if (tasksRes.error) {
+      toast({ title: "Error loading tasks", description: tasksRes.error.message, variant: "destructive" });
+      return;
+    }
+
+    const fieldRows = (Array.isArray(fieldsRes.data) ? fieldsRes.data : []) as NamedEntity[];
+    const vehicleRows = (Array.isArray(vehiclesRes.data) ? vehiclesRes.data : []) as NamedEntity[];
+    const fieldNameById = new Map<number, string>(fieldRows.map((f) => [f.id, f.name]));
+    const vehicleNameById = new Map<number, string>(vehicleRows.map((v) => [v.id, v.name]));
+
+    const rawTasks = (Array.isArray(tasksRes.data) ? tasksRes.data : []) as Omit<TaskRow, "fields" | "vehicles">[];
+    const enrichedTasks: TaskRow[] = rawTasks.map((t) => ({
+      ...t,
+      fields: fieldNameById.has(t.field_id) ? { name: fieldNameById.get(t.field_id)! } : null,
+      vehicles: t.vehicle_id && vehicleNameById.has(t.vehicle_id) ? { name: vehicleNameById.get(t.vehicle_id)! } : null,
+    }));
+
+    setTasks(enrichedTasks);
     setLoading(false);
   };
 

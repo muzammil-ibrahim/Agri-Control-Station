@@ -25,8 +25,8 @@ import {
 import { useVehicleData } from "@/hooks/useVehicleData";
 import { useToast } from "@/hooks/use-toast";
 
-// default coordinates until we fetch real data
-const mockCoordinates = [
+// Default coordinates until we fetch real data
+const initialCoordinates = [
 ];
 
 
@@ -36,7 +36,7 @@ export default function PlotMapping() {
   const [isStarted, setIsStarted] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [showFinishDialog, setShowFinishDialog] = useState(false);
-  const [coordinates, setCoordinates] = useState<typeof mockCoordinates>(mockCoordinates);
+  const [coordinates, setCoordinates] = useState<typeof initialCoordinates>(initialCoordinates);
   const [isOverlayDismissed, setIsOverlayDismissed] = useState(false);
   const { data: vehicleData, loading, error } = useVehicleData();
   const { toast } = useToast();
@@ -149,7 +149,7 @@ export default function PlotMapping() {
 
       if (data.status === "stopped") {
         setIsStarted(false);
-        navigate("/fields/create");  // optional if you want to navigate
+        navigate("/fields/create", { state: { capturedCoordinates: coordinates } });
       }
     } catch (error) {
       console.error("Error stopping logging:", error);

@@ -5,8 +5,8 @@ from pathlib import Path
 import csv
 import time
 
-PORT = 'udp:0.0.0.0:14550'
-BAUD = 57600
+PORT = 'COM3'
+BAUD = 115200
 DEFAULT_ALT = 10.0
 CSV_FILE = 'C:\\Users\\Muzammil\\Downloads\\field-command-hub-new\\Backend\\CSV_data\\points_latlon.csv'
 REQUEST_TIMEOUT = 10
