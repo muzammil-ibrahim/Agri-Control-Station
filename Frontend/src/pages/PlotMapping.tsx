@@ -29,6 +29,15 @@ import { useToast } from "@/hooks/use-toast";
 const initialCoordinates = [
 ];
 
+const getHttpBackendUrl = () => {
+  if (typeof window !== "undefined" && window.location.port === "8000") {
+    return window.location.origin;
+  }
+
+  let backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
+  return backendUrl.replace(/^ws:/, "http:").replace(/^wss:/, "https:");
+};
+
 
 export default function PlotMapping() {
   const navigate = useNavigate();
@@ -43,9 +52,7 @@ export default function PlotMapping() {
 
   // fetch geofence points from backend CSV and refresh periodically if started
   const fetchGeofence = () => {
-    let backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
-    // convert websocket scheme to http(s) if necessary
-    backendUrl = backendUrl.replace(/^ws:/, "http:").replace(/^wss:/, "https:");
+    const backendUrl = getHttpBackendUrl();
     fetch(`${backendUrl}/api/geofence`)
       .then((res) => res.json())
       .then((data) => {
@@ -123,7 +130,7 @@ export default function PlotMapping() {
 
   const handleStart = async () => {
     try {
-      const response = await fetch("http://localhost:8000/api/start", {
+      const response = await fetch(`${getHttpBackendUrl()}/api/start`, {
         method: "POST",
       });
 
@@ -140,7 +147,7 @@ export default function PlotMapping() {
 
   const handleStop = async () => {
     try {
-      const response = await fetch("http://localhost:8000/api/stop", {
+      const response = await fetch(`${getHttpBackendUrl()}/api/stop`, {
         method: "POST",
       });
 
