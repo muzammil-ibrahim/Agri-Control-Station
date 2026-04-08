@@ -83,9 +83,9 @@ app.include_router(api_router)
 # ============================================
 @app.get("/generate")
 async def generate_points(
-    col_spacing_ft: float = Query(4),
-    row_spacing_ft: float = Query(10),
-    border_margin_ft: float = Query(4)
+    col_spacing_ft: float = Query(0),
+    row_spacing_ft: float = Query(0),
+    border_margin_ft: float = Query(0)
 ):
     """
     Generate mission waypoint grid from geofence.
