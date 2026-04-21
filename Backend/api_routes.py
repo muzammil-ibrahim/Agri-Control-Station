@@ -597,6 +597,11 @@ def start_task_mission(task_id: int, db: Session = Depends(get_db)):
     if task_points_count == 0:
         raise HTTPException(status_code=400, detail="Task has no generated mission points")
 
+    # Starting mission should immediately reflect an active task in persistence.
+    if task.status != "active":
+        task.status = "active"
+        db.commit()
+
     def run_upload():
         try:
             result = upload_task_mission(task_id)

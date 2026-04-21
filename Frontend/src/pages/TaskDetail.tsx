@@ -38,9 +38,7 @@ export default function TaskDetail() {
   const [taskLoading, setTaskLoading] = useState(true);
   const [isArmed, setIsArmed] = useState(false);
   const [vehicleMode, setVehicleMode] = useState("AUTO");
-  const [isStarted, setIsStarted] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
   const { data: vehicleData, yaw, tractorPos, loading, error } = useVehicleData();
   const { toast } = useToast();
 
@@ -170,6 +168,23 @@ export default function TaskDetail() {
   const allChecksReady = preChecks.every(check => check.ok);
   const failingChecks = preChecks.filter(check => !check.ok);
 
+  const updateTaskStatus = async (status: string) => {
+    if (!task) return false;
+
+    const { data, error } = await tasksApi.update(task.id, { status });
+    if (error || !data) {
+      toast({
+        title: "Status Update Failed",
+        description: error?.message || "Unable to update task status.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    setTask(data as TaskDetailData);
+    return true;
+  };
+
   const handleStartClick = async () => {
     if (!id) {
       return;
@@ -189,7 +204,11 @@ export default function TaskDetail() {
       return;
     }
 
-    setIsStarted(true);
+    const updated = await updateTaskStatus("active");
+    if (!updated) {
+      return;
+    }
+
     toast({
       title: "Mission Upload Started",
       description: `${data.waypoints} waypoints are being sent to the vehicle.`,
@@ -224,6 +243,8 @@ export default function TaskDetail() {
     paused: 50,
   };
   const progress = progressByStatus[task.status] ?? 0;
+  const isStarted = task.status === "active" || task.status === "paused";
+  const isPaused = task.status === "paused";
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden">
@@ -283,7 +304,7 @@ export default function TaskDetail() {
           {/* Controls below camera */}
           <div className="p-3 space-y-2">
             {!isStarted ? (
-              <Button className="w-full" onClick={handleStartClick}>
+              <Button className="w-full" onClick={handleStartClick} disabled={isStarting}>
                 {/* disabled={!canStartTask || isStarting} */}
                 {isStarting ? "Starting..." : "Start"}
               </Button>
@@ -292,17 +313,14 @@ export default function TaskDetail() {
                 <Button
                   variant="secondary"
                   className="flex-1"
-                  onClick={() => setIsPaused(!isPaused)}
+                  onClick={() => updateTaskStatus(isPaused ? "active" : "paused")}
                 >
                   {isPaused ? "Resume" : "Pause"}
                 </Button>
                 <Button
                   variant="destructive"
                   className="flex-1"
-                  onClick={() => {
-                    setIsStarted(false);
-                    setIsPaused(false);
-                  }}
+                  onClick={() => updateTaskStatus("pending")}
                 >
                   Stop
                 </Button>
