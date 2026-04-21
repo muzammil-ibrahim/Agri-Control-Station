@@ -29,9 +29,12 @@ interface TaskDetailData {
   status: string;
 }
 
+const BACKEND_WS_URL = import.meta.env.VITE_BACKEND_URL || "ws://localhost:8000";
+
 export default function TaskDetail() {
   const { id } = useParams();
   const [task, setTask] = useState<TaskDetailData | null>(null);
+  const [seedlingCount, setSeedlingCount] = useState(0);
   const [taskLoading, setTaskLoading] = useState(true);
   const [isArmed, setIsArmed] = useState(false);
   const [vehicleMode, setVehicleMode] = useState("AUTO");
@@ -96,6 +99,35 @@ export default function TaskDetail() {
     };
 
     loadTaskMapData();
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) {
+      setSeedlingCount(0);
+      return;
+    }
+
+    const taskId = Number(id);
+    if (!Number.isFinite(taskId)) {
+      setSeedlingCount(0);
+      return;
+    }
+
+    const wsUrl = `${BACKEND_WS_URL.replace(/\/$/, "")}/api/ws/tasks/${taskId}/seedling-count`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        setSeedlingCount(Number(payload.seedling_count) || 0);
+      } catch {
+        // Ignore malformed payloads and keep latest valid count.
+      }
+    };
+
+    return () => {
+      ws.close();
+    };
   }, [id]);
 
   useEffect(() => {
@@ -306,6 +338,10 @@ export default function TaskDetail() {
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Plot</span>
                 <span className="text-foreground font-medium font-mono">Field #{task.field_id}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Seedling Count</span>
+                <span className="text-foreground font-medium font-mono">{seedlingCount}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Time</span>

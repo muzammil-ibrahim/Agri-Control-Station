@@ -159,6 +159,15 @@ export const tasksApi = {
     `/tasks/${id}/start-mission`,
     { method: "POST" }
   ),
+  getSeedlingCount: (id: number) =>
+    apiRequest<{ task_id: number; seedling_count: number }>(`/tasks/${id}/seedling-count`),
+  incrementSeedlingCount: (id: number, count = 1) =>
+    apiRequest<{ task_id: number; seedling_count: number; delta: number }>(
+      `/tasks/${id}/seedling-count/increment?count=${count}`,
+      { method: "POST" }
+    ),
+  resetSeedlingCount: (id: number) =>
+    apiRequest<{ task_id: number; seedling_count: number }>(`/tasks/${id}/seedling-count/reset`, { method: "POST" }),
   create: (data: {
     field_id: number; vehicle_id?: number; task_type: string;
     target_quantity?: number; unit?: string; scheduled_at?: string; recurrence_rule?: string;

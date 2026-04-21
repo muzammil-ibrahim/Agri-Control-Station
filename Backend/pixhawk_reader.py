@@ -3,6 +3,7 @@ import threading
 import asyncio
 import struct
 import time
+from typing import Callable, Optional
 
 PIXHAWK_PORT = "COM3"
 BAUDRATE = 57600
@@ -10,6 +11,7 @@ BAUDRATE = 57600
 _shared_master = None
 _mission_transfer_in_progress = False
 _connection_lock = threading.RLock()
+_seedling_increment_handler: Optional[Callable[[int], None]] = None
 
 
 def set_shared_master(master):
@@ -32,6 +34,11 @@ def is_mission_transfer_in_progress():
 
 def get_connection_lock():
     return _connection_lock
+
+
+def register_seedling_increment_handler(handler: Callable[[int], None]):
+    global _seedling_increment_handler
+    _seedling_increment_handler = handler
 
 # Sensor tunnel constants (must match onboard firmware)
 SENSOR_PAYLOAD_TYPE = 32800
@@ -63,6 +70,45 @@ class PixhawkReader:
         self.master = None
         self.last_rc_update = 0
         self.connected = False
+        self.last_seedling_telemetry_total = None
+
+    def _emit_seedling_increment(self, delta: int):
+        if delta <= 0:
+            return
+        if _seedling_increment_handler is None:
+            return
+        try:
+            _seedling_increment_handler(delta)
+        except Exception as e:
+            print(f"Seedling increment handler error: {e}")
+
+    def _handle_named_value_seedling(self, name: str, value: float):
+        normalized_name = name.strip().upper()
+
+        # Increment-style telemetry: each message is the increment to apply.
+        if normalized_name in {"SEEDLING_INC", "SEEDLING_DROP", "IR_BREAK"}:
+            delta = int(round(value))
+            if delta > 0:
+                print(f"[SEEDLING] Telemetry {normalized_name}={value} -> delta={delta}")
+                self._emit_seedling_increment(delta)
+            return True
+
+        # Counter-style telemetry: message carries total break-beam count.
+        if normalized_name in {"SEEDLING_COUNT", "IR_BREAK_COUNT"}:
+            current_total = int(round(value))
+            if self.last_seedling_telemetry_total is None:
+                self.last_seedling_telemetry_total = current_total
+                print(f"[SEEDLING] Baseline {normalized_name}={current_total}")
+                return True
+
+            delta = current_total - self.last_seedling_telemetry_total
+            self.last_seedling_telemetry_total = current_total
+            if delta > 0:
+                print(f"[SEEDLING] Telemetry {normalized_name}={current_total} -> delta={delta}")
+                self._emit_seedling_increment(delta)
+            return True
+
+        return False
 
     async def connect(self):
 
@@ -177,14 +223,18 @@ class PixhawkReader:
                         self.vehicle_state.rc_connection = True
                 
                 # ---------------- (wheel/sensor data) ----------------
-                elif msg_type == "NAMED_VALUE_FLOAT":
+                elif msg_type in ("NAMED_VALUE_FLOAT", "NAMED_VALUE_INT"):
 
                     try:
                         if isinstance(msg.name, bytes):
                             name = msg.name.decode(errors='ignore').strip('\x00')
                         else:
                             name = msg.name.strip('\x00')
-                        value = round(msg.value, 2)
+                        raw_value = float(msg.value)
+                        value = round(raw_value, 2)
+
+                        if self._handle_named_value_seedling(name, raw_value):
+                            continue
 
                         parts = name.split("_") 
 

@@ -1,12 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
-from typing import Optional, List
+from typing import Optional, List, Dict
 import csv
 import io
 import os
 import tempfile
 import threading
-from database import get_db, init_db
+import asyncio
+from database import get_db, init_db, SessionLocal
 from database import (
     Farm, Field, GeoPoint, CropSeason, Vehicle, Task, TaskExecution, TaskGeneratedPoint,
     Alert, CropLog, GrowthObservation, PestRecord, DiseaseRecord,
@@ -14,7 +15,7 @@ from database import (
 )
 from mission_utils import generate_mission_points, convert_points_to_latlon, transform_latlon_lists_to_xy
 from mission_sender import upload_task_mission
-from pixhawk_reader import is_mission_transfer_in_progress
+from pixhawk_reader import is_mission_transfer_in_progress, register_seedling_increment_handler
 from schemas import (
     Farm as FarmSchema, FarmCreate, FarmUpdate,
     Field as FieldSchema, FieldCreate, FieldUpdate,
@@ -40,6 +41,79 @@ router = APIRouter(prefix="/api", tags=["api"])
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV_DATA_DIR = os.path.join(BASE_DIR, "CSV_data")
 GEOFENCE_INPUT_PATH = os.path.join(CSV_DATA_DIR, "geofence.csv")
+
+# In-memory seedling counters keyed by task id.
+task_seedling_counts: Dict[int, int] = {}
+task_seedling_count_lock = threading.Lock()
+task_seedling_ws_clients: Dict[int, List[WebSocket]] = {}
+
+
+async def _broadcast_task_seedling_count(task_id: int, seedling_count: int):
+    with task_seedling_count_lock:
+        clients = list(task_seedling_ws_clients.get(task_id, []))
+
+    if not clients:
+        return
+
+    payload = {
+        "task_id": task_id,
+        "seedling_count": seedling_count,
+    }
+    disconnected_clients: List[WebSocket] = []
+
+    for websocket in clients:
+        try:
+            await websocket.send_json(payload)
+        except Exception:
+            disconnected_clients.append(websocket)
+
+    if disconnected_clients:
+        with task_seedling_count_lock:
+            remaining = [ws for ws in task_seedling_ws_clients.get(task_id, []) if ws not in disconnected_clients]
+            if remaining:
+                task_seedling_ws_clients[task_id] = remaining
+            else:
+                task_seedling_ws_clients.pop(task_id, None)
+
+
+def _resolve_active_seedling_task_id() -> Optional[int]:
+    db = SessionLocal()
+    try:
+        active_task = (
+            db.query(Task)
+            .filter(Task.status == "active")
+            .order_by(Task.updated_at.desc(), Task.id.desc())
+            .first()
+        )
+        return active_task.id if active_task else None
+    finally:
+        db.close()
+
+
+def _apply_seedling_increment_from_telemetry(delta: int):
+    if delta <= 0:
+        return
+
+    task_id = _resolve_active_seedling_task_id()
+    if task_id is None:
+        print(f"[SEEDLING] Ignored telemetry delta={delta}: no active task status found")
+        return
+
+    with task_seedling_count_lock:
+        previous = task_seedling_counts.get(task_id, 0)
+        next_count = previous + delta
+        task_seedling_counts[task_id] = next_count
+        print(f"[SEEDLING] Telemetry delta={delta} applied to task={task_id}: {previous} -> {next_count}")
+
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(_broadcast_task_seedling_count(task_id, next_count))
+    except Exception as exc:
+        # Frontend still gets updated count on reconnect/read via websocket initial payload.
+        print(f"[SEEDLING] Broadcast scheduling failed for task={task_id}: {exc}")
+
+
+register_seedling_increment_handler(_apply_seedling_increment_from_telemetry)
 
 
 # =====================
@@ -537,6 +611,95 @@ def start_task_mission(task_id: int, db: Session = Depends(get_db)):
         "task_id": task_id,
         "waypoints": task_points_count,
         "message": "Mission upload started",
+    }
+
+
+@router.get("/tasks/{task_id}/seedling-count")
+def get_task_seedling_count(task_id: int, db: Session = Depends(get_db)):
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    with task_seedling_count_lock:
+        count = task_seedling_counts.get(task_id, 0)
+
+    return {
+        "task_id": task_id,
+        "seedling_count": count,
+    }
+
+
+@router.websocket("/ws/tasks/{task_id}/seedling-count")
+async def task_seedling_count_ws(websocket: WebSocket, task_id: int, db: Session = Depends(get_db)):
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        await websocket.close(code=1008, reason="Task not found")
+        return
+
+    await websocket.accept()
+
+    with task_seedling_count_lock:
+        task_seedling_ws_clients.setdefault(task_id, []).append(websocket)
+        current_count = task_seedling_counts.get(task_id, 0)
+
+    await websocket.send_json({
+        "task_id": task_id,
+        "seedling_count": current_count,
+    })
+
+    try:
+        # Keep the connection alive and detect client disconnects.
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        with task_seedling_count_lock:
+            remaining = [ws for ws in task_seedling_ws_clients.get(task_id, []) if ws is not websocket]
+            if remaining:
+                task_seedling_ws_clients[task_id] = remaining
+            else:
+                task_seedling_ws_clients.pop(task_id, None)
+
+
+@router.post("/tasks/{task_id}/seedling-count/increment")
+async def increment_task_seedling_count(
+    task_id: int,
+    count: int = Query(1, ge=1, le=1000),
+    db: Session = Depends(get_db),
+):
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    with task_seedling_count_lock:
+        previous = task_seedling_counts.get(task_id, 0)
+        next_count = previous + count
+        task_seedling_counts[task_id] = next_count
+
+    await _broadcast_task_seedling_count(task_id, next_count)
+
+    return {
+        "task_id": task_id,
+        "seedling_count": next_count,
+        "delta": count,
+    }
+
+
+@router.post("/tasks/{task_id}/seedling-count/reset")
+async def reset_task_seedling_count(task_id: int, db: Session = Depends(get_db)):
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    with task_seedling_count_lock:
+        task_seedling_counts[task_id] = 0
+
+    await _broadcast_task_seedling_count(task_id, 0)
+
+    return {
+        "task_id": task_id,
+        "seedling_count": 0,
     }
 
 
