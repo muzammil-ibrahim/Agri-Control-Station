@@ -3,6 +3,7 @@ import threading
 import asyncio
 import struct
 import time
+import re
 from typing import Callable, Optional
 
 PIXHAWK_PORT = "COM3"
@@ -11,7 +12,7 @@ BAUDRATE = 57600
 _shared_master = None
 _mission_transfer_in_progress = False
 _connection_lock = threading.RLock()
-_seedling_increment_handler: Optional[Callable[[int], None]] = None
+_seedling_increment_handler: Optional[Callable[[int, Optional[str]], None]] = None
 
 
 def set_shared_master(master):
@@ -36,7 +37,7 @@ def get_connection_lock():
     return _connection_lock
 
 
-def register_seedling_increment_handler(handler: Callable[[int], None]):
+def register_seedling_increment_handler(handler: Callable[[int, Optional[str]], None]):
     global _seedling_increment_handler
     _seedling_increment_handler = handler
 
@@ -70,42 +71,62 @@ class PixhawkReader:
         self.master = None
         self.last_rc_update = 0
         self.connected = False
-        self.last_seedling_telemetry_total = None
+        self.last_seedling_telemetry_totals = {}
 
-    def _emit_seedling_increment(self, delta: int):
+    def _emit_seedling_increment(self, delta: int, sensor_id: Optional[str] = None):
         if delta <= 0:
             return
         if _seedling_increment_handler is None:
             return
         try:
-            _seedling_increment_handler(delta)
+            _seedling_increment_handler(delta, sensor_id)
         except Exception as e:
             print(f"Seedling increment handler error: {e}")
 
     def _handle_named_value_seedling(self, name: str, value: float):
         normalized_name = name.strip().upper()
+        sensor_id: Optional[str] = None
+
+        ir_break_match = re.fullmatch(r"IR([A-Z0-9]+)_BREAK", normalized_name)
+        ir_count_match = re.fullmatch(r"IR([A-Z0-9]+)_COUNT", normalized_name)
+        ir_count_suffix_match = re.fullmatch(r"IR_COUNT_([A-Z0-9]+)", normalized_name)
+
+        if ir_break_match:
+            sensor_id = ir_break_match.group(1)
+            normalized_name = "IR_BREAK"
+        elif ir_count_match:
+            sensor_id = ir_count_match.group(1)
+            normalized_name = "IR_COUNT"
+        elif ir_count_suffix_match:
+            sensor_id = ir_count_suffix_match.group(1)
+            normalized_name = "IR_COUNT"
 
         # Increment-style telemetry: each message is the increment to apply.
         if normalized_name in {"SEEDLING_INC", "SEEDLING_DROP", "IR_BREAK"}:
             delta = int(round(value))
             if delta > 0:
-                print(f"[SEEDLING] Telemetry {normalized_name}={value} -> delta={delta}")
-                self._emit_seedling_increment(delta)
+                sensor_label = sensor_id if sensor_id is not None else "default"
+                print(f"[SEEDLING] Telemetry {normalized_name}={value} sensor={sensor_label} -> delta={delta}")
+                self._emit_seedling_increment(delta, sensor_id)
             return True
 
         # Counter-style telemetry: message carries total break-beam count.
-        if normalized_name in {"SEEDLING_COUNT", "IR_BREAK_COUNT"}:
+        # IR_COUNT is sent by Backend/test/IR_BB_SerToMav.py.
+        if normalized_name in {"SEEDLING_COUNT", "IR_BREAK_COUNT", "IR_COUNT"}:
             current_total = int(round(value))
-            if self.last_seedling_telemetry_total is None:
-                self.last_seedling_telemetry_total = current_total
-                print(f"[SEEDLING] Baseline {normalized_name}={current_total}")
+            source_key = sensor_id if sensor_id is not None else "default"
+
+            if source_key not in self.last_seedling_telemetry_totals:
+                self.last_seedling_telemetry_totals[source_key] = current_total
+                print(f"[SEEDLING] Baseline {normalized_name}={current_total} sensor={source_key}")
                 return True
 
-            delta = current_total - self.last_seedling_telemetry_total
-            self.last_seedling_telemetry_total = current_total
+            delta = current_total - self.last_seedling_telemetry_totals[source_key]
+            self.last_seedling_telemetry_totals[source_key] = current_total
             if delta > 0:
-                print(f"[SEEDLING] Telemetry {normalized_name}={current_total} -> delta={delta}")
-                self._emit_seedling_increment(delta)
+                sensor_label = sensor_id if sensor_id is not None else "default"
+                print(f"[SEEDLING] Telemetry {normalized_name}={current_total} sensor={sensor_label} -> delta={delta}")
+                self._emit_seedling_increment(delta, sensor_id)
             return True
 
         return False

@@ -1,3 +1,10 @@
+# python3 skid_nav_test.py --waypoints received_waypoints.csv --vehicle-port /dev/ttyACM1 --vehicle-baud 57600 --motor-port /dev/ttyACM0 --motor-baud 115200
+
+# If you want to test without moving motors first:
+
+# python3 skid_nav_test.py --waypoints received_waypoints.csv --vehicle-port /dev/ttyACM1 --vehicle-baud 57600 --dry-run
+
+
 import argparse
 import csv
 import math
@@ -21,7 +28,7 @@ DEFAULT_FORWARD_SPEED = 40
 DEFAULT_HEADING_TOLERANCE = 10
 DEFAULT_WAYPOINT_RADIUS = 1.5
 DEFAULT_LOOP_DT = 0.1
-DEFAULT_MIN_TRACK_SPEED = 8
+DEFAULT_MIN_TRACK_SPEED = 20
 DEFAULT_DISTANCE_GAIN = 0.8
 DEFAULT_HEADING_RATE_GAIN = 0.08
 DEFAULT_MAX_HEADING_RATE = 40.0
@@ -111,8 +118,10 @@ class SkidRobot:
         left_cmd = int(wheel_speed_cmd - heading_rate_cmd)
         right_cmd = int(wheel_speed_cmd + heading_rate_cmd)
 
-        left_cmd = max(self.min_track_speed, min(self.forward_speed, left_cmd))
-        right_cmd = max(self.min_track_speed, min(self.forward_speed, right_cmd))
+        # Keep per-wheel clamping at [0, max] so heading correction can slow one side enough.
+        # Enforcing min speed per wheel can cancel turning and make the rover appear stuck.
+        left_cmd = max(0, min(self.forward_speed, left_cmd))
+        right_cmd = max(0, min(self.forward_speed, right_cmd))
 
         self.set_motor_speeds(left_cmd, right_cmd)
         return left_cmd, right_cmd
@@ -174,6 +183,12 @@ def load_waypoints_from_csv(csv_path: Path):
 
             lat = float(lat_raw)
             lon = float(lon_raw)
+
+            # Ignore placeholder/invalid zero coordinate rows.
+            if lat == 0.0 and lon == 0.0:
+                print(f"Skipping row {idx} with zero coordinates")
+                continue
+
             heading = float(heading_raw) if heading_raw not in (None, "") else 0.0
 
             waypoints.append((lat, lon, heading))
@@ -201,13 +216,14 @@ def run_mission(robot: SkidRobot, waypoints, stop_time: float):
 def parse_args():
     parser = argparse.ArgumentParser(description="Test swerve-style navigation on a skid rover")
 
+    default_waypoint = Path(__file__).resolve().parent.parent / "test" / "received_waypoints.csv"
     parser.add_argument(
         "--waypoints",
-        default=str(Path(__file__).resolve().parent.parent /"received_waypoints.csv"),
+        default=str(default_waypoint),
         help="CSV path with waypoint columns (lat/lon or latitude/longitude)",
     )
     parser.add_argument("--vehicle-port", default="/dev/ttyACM1", help="Pixhawk telemetry port")
-    parser.add_argument("--vehicle-baud", type=int, default=115200, help="Pixhawk baud rate")
+    parser.add_argument("--vehicle-baud", type=int, default=57600, help="Pixhawk baud rate")
     parser.add_argument("--motor-port", default="/dev/ttyACM0", help="Skid motor controller port")
     parser.add_argument("--motor-baud", type=int, default=115200, help="Skid motor serial baud")
     parser.add_argument("--turn-speed", type=int, default=DEFAULT_TURN_SPEED)

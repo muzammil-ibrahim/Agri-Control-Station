@@ -30,24 +30,32 @@ except Exception:
     GPIO = None
 
 
-def send_ir_break_increment(master) -> None:
+def _build_break_name(sensor_id: str) -> bytes:
+    sanitized = "".join(ch for ch in str(sensor_id) if ch.isalnum())
+    if not sanitized:
+        sanitized = "1"
+    key = f"IR{sanitized}_BREAK"[:10]
+    return key.encode("ascii", errors="ignore")
+
+
+def send_ir_break_increment(master, sensor_name: bytes) -> None:
     now_ms = int(time.time() * 1000) & 0xFFFFFFFF
     master.mav.named_value_int_send(
         now_ms,
-        b"IR_BREAK",
+        sensor_name,
         1,
     )
 
 
-def run_simulation(master) -> None:
+def run_simulation(master, sensor_name: bytes) -> None:
     print("Simulation mode enabled. Press Enter to simulate a beam break. Ctrl+C to stop.")
     while True:
         input()
-        send_ir_break_increment(master)
+        send_ir_break_increment(master, sensor_name)
         print("[SEEDLING] Beam break detected. Telemetry increment sent.")
 
 
-def run_gpio(master, pin: int, debounce_seconds: float) -> None:
+def run_gpio(master, pin: int, debounce_seconds: float, sensor_name: bytes) -> None:
     if GPIO is None:
         print("[ERROR] RPi.GPIO is unavailable. Use --simulate on non-Raspberry Pi systems.")
         sys.exit(1)
@@ -68,7 +76,7 @@ def run_gpio(master, pin: int, debounce_seconds: float) -> None:
 
             # Count on edge transition to blocked with debounce.
             if is_blocked and not was_blocked and (now - last_detection) >= debounce_seconds:
-                send_ir_break_increment(master)
+                send_ir_break_increment(master, sensor_name)
                 print("[SEEDLING] Beam break detected. Telemetry increment sent.")
                 last_detection = now
 
@@ -84,6 +92,7 @@ def main() -> None:
     parser.add_argument("--baud", type=int, default=57600, help="Serial baud rate when using COM port")
     parser.add_argument("--pin", type=int, default=17, help="BCM GPIO pin for IR beam output")
     parser.add_argument("--debounce", type=float, default=0.25, help="Debounce window in seconds")
+    parser.add_argument("--sensor-id", default="1", help="IR sensor ID (e.g. 1, 2, left, right)")
     parser.add_argument("--simulate", action="store_true", help="Run without GPIO hardware")
     args = parser.parse_args()
 
@@ -94,12 +103,14 @@ def main() -> None:
 
     master = mavutil.mavlink_connection(args.connection, baud=args.baud)
     print(f"MAVLink telemetry connection ready: {args.connection}")
+    sensor_name = _build_break_name(args.sensor_id)
+    print(f"Using telemetry name: {sensor_name.decode(errors='ignore')}")
 
     try:
         if args.simulate:
-            run_simulation(master)
+            run_simulation(master, sensor_name)
         else:
-            run_gpio(master, args.pin, args.debounce)
+            run_gpio(master, args.pin, args.debounce, sensor_name)
     except KeyboardInterrupt:
         print("\nStopped.")
 

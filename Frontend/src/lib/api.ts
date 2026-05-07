@@ -161,6 +161,16 @@ export const tasksApi = {
   ),
   getSeedlingCount: (id: number) =>
     apiRequest<{ task_id: number; seedling_count: number }>(`/tasks/${id}/seedling-count`),
+  getSeedlingLogs: (id: number, limit = 50) =>
+    apiRequest<Array<{
+      id: number;
+      task_id: number;
+      sensor_id: string;
+      delta: number;
+      count: number | null;
+      timestamp: string | null;
+      notes?: string;
+    }>>(`/tasks/${id}/seedling-logs?limit=${limit}`),
   incrementSeedlingCount: (id: number, count = 1) =>
     apiRequest<{ task_id: number; seedling_count: number; delta: number }>(
       `/tasks/${id}/seedling-count/increment?count=${count}`,

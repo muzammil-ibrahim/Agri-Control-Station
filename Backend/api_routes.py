@@ -7,6 +7,7 @@ import os
 import tempfile
 import threading
 import asyncio
+import re
 from database import get_db, init_db, SessionLocal
 from database import (
     Farm, Field, GeoPoint, CropSeason, Vehicle, Task, TaskExecution, TaskGeneratedPoint,
@@ -90,7 +91,33 @@ def _resolve_active_seedling_task_id() -> Optional[int]:
         db.close()
 
 
-def _apply_seedling_increment_from_telemetry(delta: int):
+def _load_task_seedling_count_from_db(db: Session, task_id: int, field_id: int) -> int:
+    rows = (
+        db.query(CropLog)
+        .filter(
+            CropLog.field_id == field_id,
+            CropLog.log_type == "seedling_count",
+            CropLog.is_auto_generated == True,
+        )
+        .order_by(CropLog.logged_at.desc(), CropLog.id.desc())
+        .limit(500)
+        .all()
+    )
+
+    for row in rows:
+        parsed = _parse_seedling_log_notes(row.notes)
+        parsed_task_id = parsed["task_id"]
+        if parsed_task_id is not None and parsed_task_id != task_id:
+            continue
+
+        total = parsed["total"]
+        if isinstance(total, int):
+            return total
+
+    return 0
+
+
+def _apply_seedling_increment_from_telemetry(delta: int, sensor_id: Optional[str] = None):
     if delta <= 0:
         return
 
@@ -99,18 +126,54 @@ def _apply_seedling_increment_from_telemetry(delta: int):
         print(f"[SEEDLING] Ignored telemetry delta={delta}: no active task status found")
         return
 
-    with task_seedling_count_lock:
-        previous = task_seedling_counts.get(task_id, 0)
-        next_count = previous + delta
-        task_seedling_counts[task_id] = next_count
-        print(f"[SEEDLING] Telemetry delta={delta} applied to task={task_id}: {previous} -> {next_count}")
-
+    db = SessionLocal()
     try:
-        loop = asyncio.get_running_loop()
-        loop.create_task(_broadcast_task_seedling_count(task_id, next_count))
+        task_obj = db.query(Task).filter(Task.id == task_id).first()
+        field_id = task_obj.field_id if task_obj else None
+
+        with task_seedling_count_lock:
+            previous = task_seedling_counts.get(task_id)
+
+        if previous is None:
+            previous = _load_task_seedling_count_from_db(db, task_id, field_id) if field_id is not None else 0
+
+        with task_seedling_count_lock:
+            # Re-check cache in case another thread updated it while DB was queried.
+            current_cached = task_seedling_counts.get(task_id)
+            if current_cached is not None:
+                previous = current_cached
+
+            next_count = previous + delta
+            task_seedling_counts[task_id] = next_count
+
+        sensor_label = sensor_id if sensor_id is not None else "default"
+        print(f"[SEEDLING] Telemetry delta={delta} sensor={sensor_label} applied to task={task_id}: {previous} -> {next_count}")
+
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(_broadcast_task_seedling_count(task_id, next_count))
+        except Exception as exc:
+            # Frontend still gets updated count on reconnect/read via websocket initial payload.
+            print(f"[SEEDLING] Broadcast scheduling failed for task={task_id}: {exc}")
+
+        # Persist seedling increment as a CropLog entry for auditing.
+        log = CropLog(
+            field_id=field_id if field_id is not None else 0,
+            crop_season_id=None,
+            log_type="seedling_count",
+            title="Seedling counter",
+            notes=f"task_id={task_id} | sensor_id={sensor_label} | delta={delta} | total={next_count}",
+            logged_by="pixhawk",
+            is_auto_generated=True,
+        )
+        db.add(log)
+        db.commit()
+        db.refresh(log)
+        print(f"[SEEDLING] Persisted CropLog id={log.id} task={task_id} delta={delta}")
     except Exception as exc:
-        # Frontend still gets updated count on reconnect/read via websocket initial payload.
-        print(f"[SEEDLING] Broadcast scheduling failed for task={task_id}: {exc}")
+        print(f"[SEEDLING] Failed to persist seedling log: {exc}")
+    finally:
+        db.close()
 
 
 register_seedling_increment_handler(_apply_seedling_increment_from_telemetry)
@@ -626,12 +689,85 @@ def get_task_seedling_count(task_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Task not found")
 
     with task_seedling_count_lock:
-        count = task_seedling_counts.get(task_id, 0)
+        count = task_seedling_counts.get(task_id)
+
+    if count is None:
+        count = _load_task_seedling_count_from_db(db, task_id, task.field_id)
+        with task_seedling_count_lock:
+            task_seedling_counts[task_id] = count
 
     return {
         "task_id": task_id,
         "seedling_count": count,
     }
+
+
+def _parse_seedling_log_notes(notes: Optional[str]) -> Dict[str, Optional[int | str]]:
+    if not notes:
+        return {
+            "task_id": None,
+            "sensor_id": None,
+            "delta": None,
+            "total": None,
+        }
+
+    task_match = re.search(r"task_id\s*=\s*(\d+)", notes)
+    sensor_match = re.search(r"sensor_id\s*=\s*([A-Za-z0-9_\-]+)", notes)
+    delta_match = re.search(r"delta\s*=\s*(-?\d+)", notes)
+    total_match = re.search(r"total\s*=\s*(-?\d+)", notes)
+
+    return {
+        "task_id": int(task_match.group(1)) if task_match else None,
+        "sensor_id": sensor_match.group(1) if sensor_match else None,
+        "delta": int(delta_match.group(1)) if delta_match else None,
+        "total": int(total_match.group(1)) if total_match else None,
+    }
+
+
+@router.get("/tasks/{task_id}/seedling-logs")
+def get_task_seedling_logs(
+    task_id: int,
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+):
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    rows = (
+        db.query(CropLog)
+        .filter(
+            CropLog.field_id == task.field_id,
+            CropLog.log_type == "seedling_count",
+            CropLog.is_auto_generated == True,
+        )
+        .order_by(CropLog.logged_at.desc(), CropLog.id.desc())
+        .limit(limit)
+        .all()
+    )
+
+    items = []
+    for row in rows:
+        parsed = _parse_seedling_log_notes(row.notes)
+        parsed_task_id = parsed["task_id"]
+
+        # Prefer strict matching when task_id is present in notes.
+        if parsed_task_id is not None and parsed_task_id != task_id:
+            continue
+
+        items.append(
+            {
+                "id": row.id,
+                "task_id": task_id,
+                "sensor_id": parsed["sensor_id"] or "default",
+                "delta": parsed["delta"] or 0,
+                "count": parsed["total"] if parsed["total"] is not None else None,
+                "timestamp": row.logged_at.isoformat() if row.logged_at else None,
+                "notes": row.notes,
+            }
+        )
+
+    return items
 
 
 @router.websocket("/ws/tasks/{task_id}/seedling-count")
@@ -645,7 +781,12 @@ async def task_seedling_count_ws(websocket: WebSocket, task_id: int, db: Session
 
     with task_seedling_count_lock:
         task_seedling_ws_clients.setdefault(task_id, []).append(websocket)
-        current_count = task_seedling_counts.get(task_id, 0)
+        current_count = task_seedling_counts.get(task_id)
+
+    if current_count is None:
+        current_count = _load_task_seedling_count_from_db(db, task_id, task.field_id)
+        with task_seedling_count_lock:
+            task_seedling_counts[task_id] = current_count
 
     await websocket.send_json({
         "task_id": task_id,
@@ -678,7 +819,16 @@ async def increment_task_seedling_count(
         raise HTTPException(status_code=404, detail="Task not found")
 
     with task_seedling_count_lock:
-        previous = task_seedling_counts.get(task_id, 0)
+        previous = task_seedling_counts.get(task_id)
+
+    if previous is None:
+        previous = _load_task_seedling_count_from_db(db, task_id, task.field_id)
+
+    with task_seedling_count_lock:
+        current_cached = task_seedling_counts.get(task_id)
+        if current_cached is not None:
+            previous = current_cached
+
         next_count = previous + count
         task_seedling_counts[task_id] = next_count
 

@@ -29,12 +29,23 @@ interface TaskDetailData {
   status: string;
 }
 
+interface SeedlingLogItem {
+  id: number;
+  task_id: number;
+  sensor_id: string;
+  delta: number;
+  count: number | null;
+  timestamp: string | null;
+  notes?: string;
+}
+
 const BACKEND_WS_URL = import.meta.env.VITE_BACKEND_URL || "ws://localhost:8000";
 
 export default function TaskDetail() {
   const { id } = useParams();
   const [task, setTask] = useState<TaskDetailData | null>(null);
   const [seedlingCount, setSeedlingCount] = useState(0);
+  const [seedlingLogs, setSeedlingLogs] = useState<SeedlingLogItem[]>([]);
   const [taskLoading, setTaskLoading] = useState(true);
   const [isArmed, setIsArmed] = useState(false);
   const [vehicleMode, setVehicleMode] = useState("AUTO");
@@ -102,14 +113,27 @@ export default function TaskDetail() {
   useEffect(() => {
     if (!id) {
       setSeedlingCount(0);
+      setSeedlingLogs([]);
       return;
     }
 
     const taskId = Number(id);
     if (!Number.isFinite(taskId)) {
       setSeedlingCount(0);
+      setSeedlingLogs([]);
       return;
     }
+
+    let active = true;
+    const loadSeedlingLogs = async () => {
+      const { data, error } = await tasksApi.getSeedlingLogs(taskId, 50);
+      if (!active || error || !data) {
+        return;
+      }
+      setSeedlingLogs(data as SeedlingLogItem[]);
+    };
+
+    loadSeedlingLogs();
 
     const wsUrl = `${BACKEND_WS_URL.replace(/\/$/, "")}/api/ws/tasks/${taskId}/seedling-count`;
     const ws = new WebSocket(wsUrl);
@@ -118,15 +142,32 @@ export default function TaskDetail() {
       try {
         const payload = JSON.parse(event.data);
         setSeedlingCount(Number(payload.seedling_count) || 0);
+        loadSeedlingLogs();
       } catch {
         // Ignore malformed payloads and keep latest valid count.
       }
     };
 
+    const pollId = window.setInterval(loadSeedlingLogs, 3000);
+
     return () => {
+      active = false;
+      window.clearInterval(pollId);
       ws.close();
     };
   }, [id]);
+
+  const formatLogTimestamp = (value: string | null) => {
+    if (!value) return "-";
+    const dt = new Date(value);
+    if (Number.isNaN(dt.getTime())) return value;
+    return dt.toLocaleString();
+  };
+
+  const formatArduinoLogLine = (entry: SeedlingLogItem) => {
+    const sensor = entry.sensor_id || "default";
+    return `ID:${sensor} SEEDLING DROPPED`;
+  };
 
   useEffect(() => {
     if (!error && !loading && vehicleData) {
@@ -374,9 +415,21 @@ export default function TaskDetail() {
               Log
             </span>
             <div className="flex-1 overflow-y-auto space-y-2 scrollbar-hide">
-              <div className="text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-2">
-                No task events available.
-              </div>
+              {seedlingLogs.length === 0 ? (
+                <div className="text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-2">
+                  No task events available.
+                </div>
+              ) : (
+                seedlingLogs.map((entry) => (
+                  <div key={entry.id} className="text-xs bg-muted/30 rounded-lg px-3 py-2 space-y-1">
+                    <div className="font-mono text-foreground">{formatArduinoLogLine(entry)}</div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-muted-foreground">Time</span>
+                      <span className="font-mono text-foreground">{formatLogTimestamp(entry.timestamp)}</span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
