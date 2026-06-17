@@ -10,7 +10,7 @@ import asyncio
 import re
 from database import get_db, init_db, SessionLocal
 from database import (
-    Farm, Field, GeoPoint, CropSeason, Vehicle, Task, TaskExecution, TaskGeneratedPoint,
+    Farm, Field, GeoPoint, CropSeason, Vehicle, Task, TaskExecution, TaskGeneratedPoint, PathPoint,
     Alert, CropLog, GrowthObservation, PestRecord, DiseaseRecord,
     SoilTest, TreatmentRecord, HarvestRecord, LogTag
 )
@@ -25,6 +25,7 @@ from schemas import (
     Vehicle as VehicleSchema, VehicleCreate,
     Task as TaskSchema, TaskCreate, TaskUpdate,
     TaskGeneratedPoint as TaskGeneratedPointSchema,
+    PathPoint as PathPointSchema,
     TaskExecution as TaskExecutionSchema, TaskExecutionCreate,
     Alert as AlertSchema, AlertCreate,
     CropLog as CropLogSchema, CropLogCreate,
@@ -530,72 +531,83 @@ def create_task(task: TaskCreate, db: Session = Depends(get_db)):
             detail="Selected field must have at least 3 geofence points in geo_points table",
         )
 
-    temp_geofence_path = None
-    temp_points_path = None
-    try:
-        with tempfile.NamedTemporaryFile(mode="w", newline="", suffix=".csv", delete=False, encoding="utf-8") as tmp:
-            writer = csv.writer(tmp)
-            writer.writerow(["latitude", "longitude"])
-            for gp in geofence_points:
-                writer.writerow([gp.lat, gp.lng])
-            temp_geofence_path = tmp.name
-
-        generation_result = generate_mission_points(
-            geofence_path=temp_geofence_path,
-            col_spacing_ft=col_spacing_ft,
-            row_spacing_ft=row_spacing_ft,
-            border_margin_ft=border_margin_ft,
-        )
-
-        if generation_result.get("status") != "success":
-            db.rollback()
-            raise HTTPException(status_code=400, detail=f"Point generation failed: {generation_result.get('message', 'Unknown error')}")
-
-        generated_points = generation_result.get("points", [])
-        with tempfile.NamedTemporaryFile(mode="w", newline="", suffix=".csv", delete=False, encoding="utf-8") as tmp_points:
-            writer = csv.writer(tmp_points)
-            writer.writerow(["x", "y"])
-            for point in generated_points:
-                writer.writerow([point.get("x", 0), point.get("y", 0)])
-            temp_points_path = tmp_points.name
-
-        converted_points_df = convert_points_to_latlon(
-            geofence_path=temp_geofence_path,
-            points_path=temp_points_path,
-        )
-
-        if len(converted_points_df.index) != len(generated_points):
-            db.rollback()
-            raise HTTPException(
-                status_code=400,
-                detail="Converted points count does not match generated mission points",
-            )
-
-        db_points = [
-            TaskGeneratedPoint(
-                task_id=db_task.id,
-                sequence_order=index + 1,
-                latitude=float(converted_points_df.iloc[index]["latitude"]),
-                longitude=float(converted_points_df.iloc[index]["longitude"]),
-            )
-            for index, point in enumerate(generated_points)
-        ]
-        if db_points:
-            db.add_all(db_points)
-    finally:
-        if temp_points_path and os.path.exists(temp_points_path):
-            os.remove(temp_points_path)
-        if temp_geofence_path and os.path.exists(temp_geofence_path):
-            os.remove(temp_geofence_path)
+    # Point generation has been intentionally disabled.
+    # temp_geofence_path = None
+    # temp_points_path = None
+    # try:
+    #     with tempfile.NamedTemporaryFile(mode="w", newline="", suffix=".csv", delete=False, encoding="utf-8") as tmp:
+    #         writer = csv.writer(tmp)
+    #         writer.writerow(["latitude", "longitude"])
+    #         for gp in geofence_points:
+    #             writer.writerow([gp.lat, gp.lng])
+    #         temp_geofence_path = tmp.name
+    #
+    #     generation_result = generate_mission_points(
+    #         geofence_path=temp_geofence_path,
+    #         col_spacing_ft=col_spacing_ft,
+    #         row_spacing_ft=row_spacing_ft,
+    #         border_margin_ft=border_margin_ft,
+    #     )
+    #
+    #     if generation_result.get("status") != "success":
+    #         db.rollback()
+    #         raise HTTPException(status_code=400, detail=f"Point generation failed: {generation_result.get('message', 'Unknown error')}")
+    #
+    #     generated_points = generation_result.get("points", [])
+    #     with tempfile.NamedTemporaryFile(mode="w", newline="", suffix=".csv", delete=False, encoding="utf-8") as tmp_points:
+    #         writer = csv.writer(tmp_points)
+    #         writer.writerow(["x", "y"])
+    #         for point in generated_points:
+    #             writer.writerow([point.get("x", 0), point.get("y", 0)])
+    #         temp_points_path = tmp_points.name
+    #
+    #     converted_points_df = convert_points_to_latlon(
+    #         geofence_path=temp_geofence_path,
+    #         points_path=temp_points_path,
+    #     )
+    #
+    #     if len(converted_points_df.index) != len(generated_points):
+    #         db.rollback()
+    #         raise HTTPException(
+    #             status_code=400,
+    #             detail="Converted points count does not match generated mission points",
+    #         )
+    #
+    #     db_points = [
+    #         TaskGeneratedPoint(
+    #             task_id=db_task.id,
+    #             sequence_order=index + 1,
+    #             latitude=float(converted_points_df.iloc[index]["latitude"]),
+    #             longitude=float(converted_points_df.iloc[index]["longitude"]),
+    #         )
+    #         for index, point in enumerate(generated_points)
+    #     ]
+    #     if db_points:
+    #         db.add_all(db_points)
+    # finally:
+    #     if temp_points_path and os.path.exists(temp_points_path):
+    #         os.remove(temp_points_path)
+    #     if temp_geofence_path and os.path.exists(temp_geofence_path):
+    #         os.remove(temp_geofence_path)
 
     db.commit()
     db.refresh(db_task)
     return db_task
 
 
-@router.get("/tasks/{task_id}/generated-points", response_model=List[TaskGeneratedPointSchema])
-def get_task_generated_points(task_id: int, db: Session = Depends(get_db)):
-    return db.query(TaskGeneratedPoint).filter(TaskGeneratedPoint.task_id == task_id).order_by(TaskGeneratedPoint.sequence_order).all()
+
+@router.get("/tasks/{task_id}/path-points", response_model=List[PathPointSchema])
+def get_task_path_points(task_id: int, db: Session = Depends(get_db)):
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    return (
+        db.query(PathPoint)
+        .filter(PathPoint.task_id == task_id)
+        .order_by(PathPoint.sequence_order)
+        .all()
+    )
 
 
 @router.get("/tasks/{task_id}/visualization-data")
@@ -614,14 +626,24 @@ def get_task_visualization_data(task_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Selected field has insufficient geofence points")
 
     task_points = (
-        db.query(TaskGeneratedPoint)
-        .filter(TaskGeneratedPoint.task_id == task.id)
-        .order_by(TaskGeneratedPoint.sequence_order)
+        db.query(PathPoint)
+        .filter(PathPoint.task_id == task.id)
+        .order_by(PathPoint.sequence_order)
         .all()
     )
+    route_source = "path_points"
+
+    if not task_points:
+        task_points = (
+            db.query(TaskGeneratedPoint)
+            .filter(TaskGeneratedPoint.task_id == task.id)
+            .order_by(TaskGeneratedPoint.sequence_order)
+            .all()
+        )
+        route_source = "task_generated_points"
 
     geofence_latlon = [{"latitude": gp.lat, "longitude": gp.lng} for gp in geofence_points]
-    generated_points_latlon = [
+    route_points_latlon = [
         {"latitude": p.latitude, "longitude": p.longitude}
         for p in task_points
         if p.latitude is not None and p.longitude is not None
@@ -629,16 +651,21 @@ def get_task_visualization_data(task_id: int, db: Session = Depends(get_db)):
 
     transformed = transform_latlon_lists_to_xy(
         geofence_latlon=geofence_latlon,
-        points_latlon=generated_points_latlon,
+        points_latlon=route_points_latlon,
     )
     if transformed.get("status") != "success":
         raise HTTPException(status_code=400, detail=f"Transform failed: {transformed.get('message', 'Unknown error')}")
 
+    route = transformed.get("points", [])
     return {
         "task_id": task.id,
         "field_id": task.field_id,
         "geofence": transformed.get("geofence", []),
-        "points": transformed.get("points", []),
+        "route": route,
+        "points": route,
+        "geofence_latlon": geofence_latlon,
+        "route_latlon": route_points_latlon,
+        "route_source": route_source,
         "reference": transformed.get("reference", {}),
     }
 
@@ -653,12 +680,18 @@ def start_task_mission(task_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=409, detail="A mission transfer is already in progress")
 
     task_points_count = (
-        db.query(TaskGeneratedPoint)
-        .filter(TaskGeneratedPoint.task_id == task_id)
+        db.query(PathPoint)
+        .filter(PathPoint.task_id == task_id)
         .count()
     )
     if task_points_count == 0:
-        raise HTTPException(status_code=400, detail="Task has no generated mission points")
+        task_points_count = (
+            db.query(TaskGeneratedPoint)
+            .filter(TaskGeneratedPoint.task_id == task_id)
+            .count()
+        )
+    if task_points_count == 0:
+        raise HTTPException(status_code=400, detail="Task has no path points")
 
     # Starting mission should immediately reflect an active task in persistence.
     if task.status != "active":

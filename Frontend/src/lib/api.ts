@@ -152,7 +152,11 @@ export const tasksApi = {
     task_id: number;
     field_id: number;
     geofence: Array<{ x: number; y: number }>;
+    route: Array<{ x: number; y: number }>;
     points: Array<{ x: number; y: number }>;
+    geofence_latlon?: Array<{ latitude: number; longitude: number }>;
+    route_latlon?: Array<{ latitude: number; longitude: number }>;
+    route_source?: string;
     reference?: { epsg?: string };
   }>(`/tasks/${id}/visualization-data`),
   startMission: (id: number) => apiRequest<{ status: string; task_id: number; waypoints: number; message: string }>(

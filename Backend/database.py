@@ -118,6 +118,7 @@ class Task(Base):
     vehicle = relationship("Vehicle", back_populates="tasks")
     task_executions = relationship("TaskExecution", back_populates="task", cascade="all, delete-orphan")
     generated_points = relationship("TaskGeneratedPoint", back_populates="task", cascade="all, delete-orphan")
+    path_points = relationship("PathPoint", back_populates="task", cascade="all, delete-orphan")
 
 
 class TaskGeneratedPoint(Base):
@@ -132,6 +133,20 @@ class TaskGeneratedPoint(Base):
 
     # Relationships
     task = relationship("Task", back_populates="generated_points")
+
+
+class PathPoint(Base):
+    __tablename__ = "path_points"
+
+    id = Column(Integer, primary_key=True, index=True)
+    task_id = Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False, index=True)
+    sequence_order = Column(Integer, nullable=False)
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+
+    # Relationships
+    task = relationship("Task", back_populates="path_points")
 
 
 class TaskExecution(Base):
@@ -374,6 +389,20 @@ def apply_schema_patches():
         """
         CREATE INDEX IF NOT EXISTS idx_task_generated_points_task_id
         ON task_generated_points (task_id)
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS path_points (
+            id SERIAL PRIMARY KEY,
+            task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+            sequence_order INTEGER NOT NULL,
+            latitude DOUBLE PRECISION NOT NULL,
+            longitude DOUBLE PRECISION NOT NULL,
+            created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_path_points_task_id
+        ON path_points (task_id)
         """,
     ]
 

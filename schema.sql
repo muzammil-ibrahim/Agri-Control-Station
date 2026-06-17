@@ -99,6 +99,19 @@ CREATE TABLE task_executions (
         ON DELETE CASCADE
 );
 
+CREATE TABLE path_points (
+    id SERIAL PRIMARY KEY,
+    task_id INTEGER NOT NULL,
+    sequence_order INTEGER NOT NULL,
+    latitude DOUBLE PRECISION NOT NULL,
+    longitude DOUBLE PRECISION NOT NULL,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_path_points_task
+        FOREIGN KEY (task_id)
+        REFERENCES tasks (id)
+        ON DELETE CASCADE
+);
+
     CREATE TABLE task_generated_points (
         id SERIAL PRIMARY KEY,
         task_id INTEGER NOT NULL,
@@ -275,6 +288,7 @@ CREATE INDEX idx_crop_seasons_field_id ON crop_seasons (field_id);
 CREATE INDEX idx_tasks_field_id ON tasks (field_id);
 CREATE INDEX idx_tasks_vehicle_id ON tasks (vehicle_id);
 CREATE INDEX idx_task_executions_task_id ON task_executions (task_id);
+CREATE INDEX idx_path_points_task_id ON path_points (task_id);
 CREATE INDEX idx_task_generated_points_task_id ON task_generated_points (task_id);
 CREATE INDEX idx_crop_logs_field_id ON crop_logs (field_id);
 CREATE INDEX idx_crop_logs_crop_season_id ON crop_logs (crop_season_id);

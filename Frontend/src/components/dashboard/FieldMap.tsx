@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import tractorTop from "../../assets/TractorTop.png";
 
 interface MapPoint {
@@ -7,34 +7,41 @@ interface MapPoint {
   y: number;
 }
 
+interface LatLngPoint {
+  id: string;
+  latitude: number;
+  longitude: number;
+}
+
 interface FieldMapProps {
   geofence: MapPoint[];
-  points: MapPoint[];
+  route?: MapPoint[];
+  points?: MapPoint[];
+  geofenceLatLng?: LatLngPoint[];
+  routeLatLng?: LatLngPoint[];
   tractorPos?: { x: number; y: number };
   yaw?: number;
-  drilledPoints?: string[];
   showControls?: boolean;
 }
 
 export const FieldMap: React.FC<FieldMapProps> = ({
   geofence,
-  points,
+  route,
+  points = [],
+  geofenceLatLng: _geofenceLatLng = [],
+  routeLatLng: _routeLatLng = [],
   tractorPos = { x: 0, y: 0 },
   yaw = 0,
-  drilledPoints = [],
   showControls = false,
 }) => {
-  const [hoveredPoint, setHoveredPoint] = useState<MapPoint | null>(null);
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const svgRef = useRef<SVGSVGElement>(null);
 
-  const slotSize = 48;
   const FRAME_W = 900;
   const FRAME_H = 600;
+  const routePoints = route || points;
 
-  // Compute bounding box for auto-scaling
   useEffect(() => {
     if (geofence.length > 0) {
       const xs = geofence.map((p) => p.x);
@@ -56,25 +63,26 @@ export const FieldMap: React.FC<FieldMapProps> = ({
 
   function polygonPath(pointsArr: MapPoint[]): string {
     if (!pointsArr.length) return "";
-    return (
-      pointsArr
-        .map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`)
-        .join(" ") + " Z"
-    );
+    return pointsArr.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ") + " Z";
   }
 
-  // Add wheel event listener for zoom
+  function linePath(pointsArr: MapPoint[]): string {
+    if (!pointsArr.length) return "";
+    return pointsArr.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
+  }
+
   useEffect(() => {
     const svg = svgRef.current;
-    if (svg) {
-      const handleWheel = (e: WheelEvent) => {
-        e.preventDefault();
-        const delta = e.deltaY > 0 ? 0.9 : 1.1;
-        setZoom((z) => Math.max(0.1, Math.min(10, z * delta)));
-      };
-      svg.addEventListener('wheel', handleWheel, { passive: false });
-      return () => svg.removeEventListener('wheel', handleWheel);
-    }
+    if (!svg) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      setZoom((z) => Math.max(0.1, Math.min(10, z * delta)));
+    };
+
+    svg.addEventListener("wheel", handleWheel, { passive: false });
+    return () => svg.removeEventListener("wheel", handleWheel);
   }, []);
 
   const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
@@ -111,7 +119,6 @@ export const FieldMap: React.FC<FieldMapProps> = ({
           transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}
           style={{ transformOrigin: "0 0" }}
         >
-          {/* Geofence polygon */}
           {geofence.length > 0 && (
             <path
               d={polygonPath(geofence)}
@@ -121,64 +128,27 @@ export const FieldMap: React.FC<FieldMapProps> = ({
             />
           )}
 
-          {/* Mission points */}
-          {points.map((p) => (
-            <g
-              key={p.id}
-              onMouseEnter={() => setHoveredPoint(p)}
-              onMouseLeave={() => setHoveredPoint(null)}
-              style={{ cursor: "pointer" }}
-            >
-              <rect
-                x={p.x - slotSize / 2}
-                y={p.y - slotSize / 2}
-                width={slotSize}
-                height={slotSize}
-                fill={drilledPoints.includes(p.id) ? "#a7f3d0" : "#dc2626"}
-                stroke="#374151"
-                strokeWidth={1 / zoom}
-              />
-              <circle cx={p.x} cy={p.y} r={6} fill="#2563eb" />
-              <text
-                x={p.x}
-                y={p.y + 3}
-                fontSize={6}
-                textAnchor="middle"
-                fill="#fff"
-                fontWeight="bold"
-              >
-                {p.id}
-              </text>
-            </g>
-          ))}
+          {routePoints.length > 1 && (
+            <path
+              d={linePath(routePoints)}
+              fill="none"
+              stroke="#5267ff"
+              strokeWidth={3}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
         </g>
 
-        {/* Tractor icon - constant size */}
         <g transform={`translate(${pan.x + tractorPos.x * zoom}, ${pan.y + tractorPos.y * zoom}) rotate(${yaw + 90})`}>
           <image href={tractorTop} x={-15} y={-15} width="30" height="30" />
         </g>
       </svg>
 
-      {/* Hover tooltip */}
-      {hoveredPoint && (
-        <div
-          className="fixed bg-white border border-gray-300 rounded shadow-lg p-2 pointer-events-none z-50"
-          style={{
-            left: `${mousePos.x + 10}px`,
-            top: `${mousePos.y + 10}px`,
-          }}
-        >
-          <div className="text-sm font-semibold text-gray-900">ID: {hoveredPoint.id}</div>
-          <div className="text-xs text-gray-600">
-            Position: ({hoveredPoint.x.toFixed(1)}, {hoveredPoint.y.toFixed(1)})
-          </div>
-        </div>
-      )}
-
-      {/* Zoom info */}
       {showControls && (
         <div className="absolute bottom-2 right-2 text-xs text-gray-600 bg-white/80 px-2 py-1 rounded">
-          Zoom: {(zoom * 100).toFixed(0)}% • Scroll to zoom • Drag to pan
+          Zoom: {(zoom * 100).toFixed(0)}% - Scroll to zoom - Drag to pan
         </div>
       )}
     </div>

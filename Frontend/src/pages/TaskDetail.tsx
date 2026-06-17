@@ -22,6 +22,12 @@ interface MapPoint {
   y: number;
 }
 
+interface LatLngPoint {
+  id: string;
+  latitude: number;
+  longitude: number;
+}
+
 interface TaskDetailData {
   id: number;
   field_id: number;
@@ -55,8 +61,9 @@ export default function TaskDetail() {
 
   // Map-related state
   const [geofence, setGeofence] = useState<MapPoint[]>([]);
-  const [points, setPoints] = useState<MapPoint[]>([]);
-  const [drilledPoints, setDrilledPoints] = useState<string[]>([]);
+  const [route, setRoute] = useState<MapPoint[]>([]);
+  const [geofenceLatLng, setGeofenceLatLng] = useState<LatLngPoint[]>([]);
+  const [routeLatLng, setRouteLatLng] = useState<LatLngPoint[]>([]);
   const [isOverlayDismissed, setIsOverlayDismissed] = useState(false);
 
   useEffect(() => {
@@ -86,7 +93,9 @@ export default function TaskDetail() {
       const { data, error } = await tasksApi.getVisualizationData(taskId);
       if (error || !data) {
         setGeofence([]);
-        setPoints([]);
+        setRoute([]);
+        setGeofenceLatLng([]);
+        setRouteLatLng([]);
         return;
       }
 
@@ -98,11 +107,28 @@ export default function TaskDetail() {
         }))
       );
 
-      setPoints(
-        (data.points || []).map((p, i) => ({
+      const routePoints = data.route || data.points || [];
+      setRoute(
+        routePoints.map((p, i) => ({
           id: String(i + 1),
           x: Number(p.x) || 0,
           y: Number(p.y) || 0,
+        }))
+      );
+
+      setGeofenceLatLng(
+        (data.geofence_latlon || []).map((p, i) => ({
+          id: String(i + 1),
+          latitude: Number(p.latitude) || 0,
+          longitude: Number(p.longitude) || 0,
+        }))
+      );
+
+      setRouteLatLng(
+        (data.route_latlon || []).map((p, i) => ({
+          id: String(i + 1),
+          latitude: Number(p.latitude) || 0,
+          longitude: Number(p.longitude) || 0,
         }))
       );
     };
@@ -374,10 +400,11 @@ export default function TaskDetail() {
         <div className="col-span-2 flex items-center justify-center bg-muted/30">
           <FieldMap
             geofence={geofence}
-            points={points}
+            route={route}
+            geofenceLatLng={geofenceLatLng}
+            routeLatLng={routeLatLng}
             tractorPos={tractorPos}
             yaw={yaw}
-            drilledPoints={drilledPoints}
           />
         </div>
 

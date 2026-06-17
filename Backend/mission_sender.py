@@ -1,7 +1,7 @@
 import time
 from typing import List, Tuple
 
-from database import SessionLocal, Task, TaskGeneratedPoint
+from database import SessionLocal, Task, TaskGeneratedPoint, PathPoint
 from pixhawk_reader import get_connection_lock, get_shared_master, set_mission_transfer_in_progress
 from pymavlink import mavutil
 
@@ -20,11 +20,18 @@ def load_task_waypoints(task_id: int) -> List[Tuple[float, float]]:
             raise ValueError(f"Task {task_id} not found")
 
         points = (
-            db.query(TaskGeneratedPoint)
-            .filter(TaskGeneratedPoint.task_id == task_id)
-            .order_by(TaskGeneratedPoint.sequence_order)
+            db.query(PathPoint)
+            .filter(PathPoint.task_id == task_id)
+            .order_by(PathPoint.sequence_order)
             .all()
         )
+        if not points:
+            points = (
+                db.query(TaskGeneratedPoint)
+                .filter(TaskGeneratedPoint.task_id == task_id)
+                .order_by(TaskGeneratedPoint.sequence_order)
+                .all()
+            )
 
         waypoints = [
             (float(point.latitude), float(point.longitude))
@@ -32,7 +39,7 @@ def load_task_waypoints(task_id: int) -> List[Tuple[float, float]]:
             if point.latitude is not None and point.longitude is not None
         ]
         if not waypoints:
-            raise ValueError(f"No generated points found for task {task_id}")
+            raise ValueError(f"No path points found for task {task_id}")
 
         return waypoints
     finally:

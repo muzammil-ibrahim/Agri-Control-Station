@@ -1,36 +1,33 @@
-import math
+import pandas as pd
+import plotly.graph_objects as go
 
-def haversine_distance(lat1, lon1, lat2, lon2):
-    # Radius of Earth in meters
-    R = 6371000  
+df = pd.read_csv("path_coordinates.csv")
 
-    # Convert degrees to radians
-    lat1 = math.radians(lat1)
-    lon1 = math.radians(lon1)
-    lat2 = math.radians(lat2)
-    lon2 = math.radians(lon2)
+mapbox_token = "YOUR_MAPBOX_ACCESS_TOKEN"
 
-    # Differences
-    dlat = lat2 - lat1
-    dlon = lon2 - lon1
+fig = go.Figure()
 
-    # Haversine formula
-    a = math.sin(dlat / 2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2)**2
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+fig.add_trace(
+    go.Scattermap(
+        lat=df["latitude"],
+        lon=df["longitude"],
+        mode="lines",
+        line=dict(width=3),
+        name="Path"
+    )
+)
 
-    # Distance in meters
-    distance = R * c
+fig.update_layout(
+    mapbox=dict(
+        accesstoken=mapbox_token,
+        style="satellite-streets",   # or "satellite"
+        zoom=18,
+        center=dict(
+            lat=df["latitude"].mean(),
+            lon=df["longitude"].mean()
+        )
+    ),
+    margin=dict(l=0, r=0, t=0, b=0)
+)
 
-    return distance
-
-
-# 🔹 Example usage
-lat1, lon1 =  17.39675062377837 , 78.49014976453466
-lat2, lon2 = 17.396750984508675 , 78.49017843289745
-
-# 17.39675062377837 | 78.49014976453466
-# 17.396750984508675 | 78.49017843289745
-
-dist = haversine_distance(lat1, lon1, lat2, lon2)
-
-print(f"Distance: {dist:.4f} meters")
+fig.show()

@@ -195,6 +195,21 @@ class TaskGeneratedPoint(TaskGeneratedPointBase):
         from_attributes = True
 
 
+class PathPointBase(BaseModel):
+    task_id: int
+    sequence_order: int
+    latitude: float
+    longitude: float
+
+
+class PathPoint(PathPointBase):
+    id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 # =====================
 # TASK EXECUTIONS
 # =====================
