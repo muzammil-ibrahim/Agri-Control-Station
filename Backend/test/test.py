@@ -3,10 +3,9 @@ import plotly.graph_objects as go
 
 df = pd.read_csv("path_coordinates.csv")
 
-mapbox_token = "YOUR_MAPBOX_ACCESS_TOKEN"
-
 fig = go.Figure()
 
+# Main path
 fig.add_trace(
     go.Scattermap(
         lat=df["latitude"],
@@ -17,10 +16,23 @@ fig.add_trace(
     )
 )
 
+# Add arrows every N points
+step = 20
+
+fig.add_trace(
+    go.Scattermap(
+        lat=df["latitude"][::step],
+        lon=df["longitude"][::step],
+        mode="text",
+        text=[str(i) for i in range(0, len(df), step)],
+        textposition="top center",
+        name="Sequence"
+    )
+)
+
 fig.update_layout(
     mapbox=dict(
-        accesstoken=mapbox_token,
-        style="satellite-streets",   # or "satellite"
+        style="satellite",
         zoom=18,
         center=dict(
             lat=df["latitude"].mean(),
