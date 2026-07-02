@@ -1,3 +1,9 @@
+# This code defines data models for a vehicle telemetry system using Pydantic.
+#  It includes two main classes: `WheelData` for individual wheel telemetry and `VehicleData` for overall vehicle telemetry, including GPS, speed, heading, and actuator information. 
+# The models are designed to facilitate structured data handling in a FastAPI application.
+
+
+
 from pydantic import BaseModel
 from typing import Dict
 

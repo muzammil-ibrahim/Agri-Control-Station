@@ -1,3 +1,8 @@
+#  reads IR Sensor trigger events from an Arduino and sends them to a Pixhawk via MAVLink NAMED_VALUE_INT messages.
+#  program is to count the number of times an IR sensor is triggered and send that count to the Pixhawk. 
+# The Arduino is connected to the computer via a serial port, and the Pixhawk is connected via telemetry. 
+# The program listens for trigger events from the Arduino, and when a trigger event is received, it sends a MAVLink message to the Pixhawk with the trigger count.
+
 import serial
 import time
 import argparse

@@ -1,3 +1,6 @@
+# This code is for the backend of the field command hub application.
+# It provides database models and functions for managing farms, fields, geofence points, crop seasons, vehicles, tasks, and related data.
+
 import os
 from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, UniqueConstraint, func
 from sqlalchemy.ext.declarative import declarative_base

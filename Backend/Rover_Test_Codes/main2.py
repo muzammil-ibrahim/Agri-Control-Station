@@ -1,3 +1,6 @@
+#  delivery robo code for navigating using points
+
+
 from dronekit import connect
 import time
 import serial

@@ -1,3 +1,8 @@
+# this code is for the backend of the field command hub application.
+# It provides API endpoints for managing farms, fields, geofence points, crop seasons, vehicles
+#  uses fastapi for building the API, SQLAlchemy for database interactions, and includes functionality for handling seedling counts via telemetry and WebSocket connections.
+
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles

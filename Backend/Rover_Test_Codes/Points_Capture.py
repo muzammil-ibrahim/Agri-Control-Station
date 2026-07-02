@@ -1,3 +1,5 @@
+# simple program to capture boundary points for a rover using RTK GPS and save them to a CSV file
+
 from dronekit import connect
 import csv
 import os

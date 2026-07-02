@@ -1,3 +1,6 @@
+# code for delivery rover test the program reads the path coordinates from a csv file and navigates the rover to the destination 
+
+
 from dronekit import connect, VehicleMode, LocationGlobalRelative
 from rplidar import RPLidar
 import math

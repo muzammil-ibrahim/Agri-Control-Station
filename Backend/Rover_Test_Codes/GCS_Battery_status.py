@@ -1,3 +1,8 @@
+# This script connects to a vehicle via telemetry and requests the BATTERY_STATUS message stream. 
+# It then continuously receives and prints the battery status information, including battery ID, voltage, and current.
+# receiver of BATTERY_STATUS messages of 5 60V batteries from ESP32 devices over I2C and sends it to Pixhawk via MAVLink.
+
+
 from pymavlink import mavutil
 
 # Connect to telemetry radio

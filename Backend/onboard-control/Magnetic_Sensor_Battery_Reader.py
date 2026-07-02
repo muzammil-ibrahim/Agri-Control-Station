@@ -1,3 +1,8 @@
+# Reading battery data from multiple ESP32 devices over I2C and sending it to Pixhawk via MAVLink. 
+# The script connects to the Pixhawk, reads data from each ESP32 device, processes the data, and sends the battery status to the Pixhawk. 
+# If there is an error in reading from an ESP32 device, it sends a failure message with 0V to indicate the issue.
+# also sends dummy 4-wheel speed and encoder angle data to Pixhawk.
+
 from smbus2 import SMBus
 from pymavlink import mavutil
 import struct

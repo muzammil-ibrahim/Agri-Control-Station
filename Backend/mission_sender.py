@@ -1,3 +1,8 @@
+#  This code is used to upload mission waypoints to a Pixhawk flight controller. 
+# It retrieves waypoints from a database based on a task ID, sends the mission count and individual waypoints to the Pixhawk, and handles retries and timeouts during the upload process. 
+# The code ensures that the mission transfer is properly managed and provides feedback on the upload status.
+# test code
+
 import time
 from typing import List, Tuple
 

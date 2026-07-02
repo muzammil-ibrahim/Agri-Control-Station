@@ -1,3 +1,7 @@
+# for a given radius, forward speed, and wheel base, 
+# this function performs a U-turn by calculating the required wheel speeds and controlling the motors accordingly.
+# used for delivery robo testing 
+
 from dronekit import connect
 import time
 import math

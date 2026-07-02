@@ -1,3 +1,10 @@
+#  This code is responsible for reading telemetry data from a Pixhawk flight controller using the MAVLink protocol.
+# It establishes a connection to the Pixhawk, listens for various telemetry messages, and updates the vehicle state accordingly. 
+# The code handles connection management, message parsing, and provides mechanisms for handling specific telemetry data such as wheel speeds, angles, and seedling increments. 
+# It also includes functionality to manage mission transfers and ensure thread-safe access to the Pixhawk connection.
+#  It manages the battery status, GPS data, IR count of seedlings.
+
+
 from pymavlink import mavutil
 import threading
 import asyncio

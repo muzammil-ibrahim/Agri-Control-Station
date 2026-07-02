@@ -1,3 +1,7 @@
+#  this code is for the backend of the field command hub application. 
+# It provides API endpoints for managing farms, fields, geofence points, crop seasons, vehicles, tasks, and related data. 
+# The code uses FastAPI for building the API, SQLAlchemy for database interactions, and includes functionality for handling seedling counts via telemetry and WebSocket connections.
+
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 from typing import Optional, List, Dict

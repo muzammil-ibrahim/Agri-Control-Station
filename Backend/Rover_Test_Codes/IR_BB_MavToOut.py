@@ -1,3 +1,6 @@
+# This script connects to a vehicle via telemetry and requests the BATTERY_STATUS message stream. 
+# It then continuously receives and prints the battery status information, including battery ID, voltage, and
+
 import time
 import re
 from pymavlink import mavutil

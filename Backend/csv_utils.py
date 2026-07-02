@@ -1,3 +1,7 @@
+# This code is part of the backend for managing CSV files related to GPS/position data logging. 
+# It provides a class `CSVDataLogger` for handling CSV file operations, including initialization, logging points, clearing the file, and retrieving the last logged point. 
+# Additionally, it includes utility functions for calculating distances using the Haversine formula and converting fix type codes to human-readable strings.
+
 """
 CSV file management utilities
 """

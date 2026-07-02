@@ -1,3 +1,7 @@
+# This code defines the initial state of a vehicle using Pydantic models. 
+# It creates an instance of `VehicleData` with default values for various telemetry parameters, including GPS coordinates, speed, heading, battery levels, actuator positions, and wheel data. 
+# The `vehicle_state` object serves as a centralized representation of the vehicle's current state, which can be updated as new telemetry data is received.
+
 from models import VehicleData, WheelData
 
 vehicle_state = VehicleData(

@@ -1,3 +1,8 @@
+# This code is responsible for logging GPS coordinates from a vehicle and saving them to a CSV file. 
+# It includes functionality to calculate the Haversine distance between points, ensuring that only points that are sufficiently far apart are logged. 
+# The logging process runs in the background, continuously checking the vehicle's current latitude and longitude, and writing new points to the CSV file when they meet the distance threshold. 
+# The code also initializes the CSV file with headers at the start of each logging session.
+
 import pandas as pd
 import numpy as np
 import random

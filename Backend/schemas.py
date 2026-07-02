@@ -1,3 +1,6 @@
+#  this code defines data schemas for a farm management system using Pydantic.
+# for the database models
+
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional, List

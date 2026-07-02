@@ -1,3 +1,7 @@
+# This code has the functionality to generate mission points based on a geofence and specified spacing parameters. 
+# It includes functions to convert between latitude/longitude and field-relative XY coordinates, handle CSV file operations, and manage mission generation and geofence processing. 
+# The code uses libraries such as pandas, numpy, pyproj, and shapely for data manipulation, coordinate transformations, and geometric operations.
+
 """
 Mission generation and geofence processing utilities
 """
@@ -24,6 +28,9 @@ def get_epsg_code(lat: float, lon: float) -> str:
     else:
         return f"EPSG:{32700 + zone}"
 
+
+
+#  not using this function for now, but keeping it for reference , it is used to generate those points in the field based on the geofence and spacing parameters.
 
 # def generate_mission_points(
 #     geofence_path: str,
